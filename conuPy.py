@@ -1,8 +1,20 @@
-import gis10
-import os
-import pickle
+engine = "arcgis10"
+#engine = "qgis"
+
+import sys, os
+
+if engine == "arcgis10":
+    from engine_arcgis10 import *
+elif engine == "qgis":
+    from engine_qgis import *
+    import inspect
+    print inspect.getfile(inspect.currentframe()) # script filename (usually with path)
+    print os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) # script directory
+    print os.path.dirname(inspect.getfile(inspect.currentframe()))
+    sys.path.append(os.path.dirname(inspect.getfile(inspect.currentframe())))
+
+from funciones import *
 import swmmout
-import math
 
 # Origen de datos
 dropboxFolder               = "F:/Desarrollo/Utilidades/conuPy/Ejemplos/CONUPY_cuenca completa1/"
@@ -13,7 +25,7 @@ workspace                   = dataFolder + "ws"
 # Directorio del modelo
 modelFolder                 = dataFolder + "Modelo/"
 
-# Archivos de entreada
+# Archivos de entrada
 shpFileArroyos              = dataFolder + "Arroyos/Arroyos2.shp"
 shpFileCalles               = dataFolder + "Calles/Calles_Recortado2.shp"
 shpFileCuenca               = dataFolder + "Cuenca/Cuencas_Laferrere.shp"
@@ -24,22 +36,22 @@ templateShpFileLineas       = dataFolder + "Templates/lineasTemplate.shp"
 templateShpFileNodosDepth   = dataFolder + "Templates/nodosDepthsTemplate.shp"
 
 rasterFileDEM               = dataFolder + "MDT/MDT"
-rasterFileSlope             = dataFolder + "Pendientes_Cte/Pendientes"
+rasterFileSlope             = dataFolder + "Pendientes/Pendientes"
 rasterFileCoeficiente       = dataFolder + "Lluvias/lluvias.img"
 rasterFileImpermeabilidad   = dataFolder + "Impermeabilidad/Imp"
 
 swmmCorregirArroyosFileName  = modelFolder + "conurbano_3.inp"
 
 # Output fles
-shpFileNodos                = "nodos.shp"
-shpFileCentros              = "centros.shp"
-shpFileLineas               = "lineas.shp"
-shpFileSumideros            = "sumideros.shp"
-shpFileVertederos           = "vertederos.shp"
+shpFileNodos                = workspace + "/nodos.shp"
+shpFileCentros              = workspace + "/centros.shp"
+shpFileLineas               = workspace + "/lineas.shp"
+shpFileSumideros            = workspace + "/sumideros.shp"
+shpFileVertederos           = workspace + "/vertederos.shp"
 
-subcuencasShpFile           = "subcuencas.shp"
-subcuencasClipShpFile       = "subcuencasClip.shp"
-subcuencasAreaShpFile       = "subcuencasArea.shp"
+subcuencasShpFile           = workspace + "/subcuencas2.shp"
+subcuencasClipShpFile       = workspace + "/subcuencasClip.shp"
+subcuencasAreaShpFile       = workspace + "/subcuencasArea.shp"
 
 swmmInputFileName           = modelFolder + "conurbano.inp"
 gageFileName                = modelFolder + "lluvia.in"
@@ -49,15 +61,14 @@ swmmOuputFileName           = dropboxFolder + "conurbano.out"
 nodesDepthShpFile           = "nodosDepth.shp"
 nodesElevationShpFile       = "nodosElevation.shp"
 
-# Número de Gages
+# Numero de Gages
 numGages = 21
-
 
 def mainReadRivers():
     print "Proceso de creado de arroyos\n"
 
     # Leer arroyos
-    arroyos = readPolylineShp(gp, shpFileArroyos, ['Ancho', 'Alto', 'Tipo'])
+    arroyos = leer_shp_polilineas(shpFileArroyos, ['Ancho', 'Alto', 'Tipo'])
 
     # Dividir los subtramos en longitudes menores a 100m
     for arroyo in arroyos:
@@ -124,17 +135,14 @@ def mainReadStreets():
     tF = open(workspace + "/log", "w")
     tF.write("Proceso de creado de calles\n")
 
-
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
-
-    calles = readPolylineShp(gp, shpFileCalles, ['ANCHO'])
+    spatial_ref = leer_spatial_reference(shpFileCalles)
+    calles = leer_shp_polilineas(shpFileCalles, ['ANCHO'])
 
     # Crear nodos esquina y lineas calle
     nodos = readFromFile('nodosArroyo')
     lineas = readFromFile('lineasArroyo')
     for (i,calle) in enumerate(calles):
-        print "Procesando calle " + str(i) + " de " + str(len(calles)) + "\n"
+        print "Procesando calle " + str(i) + " de " + str(len(calles))
         tF.write("Procesando calle " + str(i) + " de " + str(len(calles)) + "\n")
         puntos, ancho = calle[0], calle[1]
         if (ancho == 0):
@@ -154,7 +162,7 @@ def mainReadStreets():
             #if ( puntoInicial != puntoFinal ):
             #    lineas.append( [puntoInicial, puntoFinal, "calle", ancho] )
         else:
-            # No atraviesa --> crear una calle común
+            # No atraviesa --> crear una calle comun
             puntoInicial = addNode(nodos, puntos[0], "esquina")
             puntoFinal   = addNode(nodos, puntos[-1], "esquina")
             if ( puntoInicial != puntoFinal ):
@@ -168,7 +176,7 @@ def mainReadStreets():
     sumideros = []
     for (i, nodo) in enumerate(nodos):
         if nodo[2] == "esquina":
-            # Buscar el nodo conducto más cercano
+            # Buscar el nodo conducto mas cercano
             mindist, minj = 80, -1
             for (j, nodo2) in enumerate(nodos):
                 if nodo2[2] == "conducto":
@@ -191,7 +199,7 @@ def mainReadStreets():
     vertederos = []
     for (i, nodo) in enumerate(nodos):
         if nodo[2] == "esquina":
-            # Buscar el nodo arroyo más cercano
+            # Buscar el nodo arroyo mas cercano
             mindist, minj = 50, -1
             for (j, nodo2) in enumerate(nodos):
                 if nodo2[2] == "arroyo":
@@ -219,11 +227,30 @@ def mainReadStreets():
     print "Numero de sumideros:  ", len(sumideros), "\n"
     print "Numero de vertederos:  ", len(vertederos), "\n"
 
-    writeNodesShp(gp, workspace + "/" + shpFileNodos, nodos)
-    writeNodesShp(gp, workspace + "/" + shpFileCentros, centros)
-    writeLineasShp(gp, workspace + "/" + shpFileLineas, nodos, lineas)
-    writeSumiderosShp(gp, workspace + "/" + shpFileSumideros, nodos, sumideros)
-    writeSumiderosShp(gp, workspace + "/" + shpFileVertederos, nodos, vertederos)
+    # Escribir shape con la posicion de los nodos
+    escribir_shp_puntos(shpFileNodos, nodos, {}, spatial_ref)
+    # Escribir shape con la posicion de los baricentros de subcuencas
+    escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
+
+    # Escribir shape con las conducciones
+    polilineas = [[nodos[linea[0]], nodos[linea[1]]] for linea in lineas]
+    campos = {
+                "nodo0" : [linea[0] for linea in lineas],
+                "nodo1" : [linea[1] for linea in lineas],
+                "tipo"  : [linea[2] for linea in lineas],
+                "ancho" : [linea[3] for linea in lineas]
+             }
+    escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
+
+    # Escribir shape de sumideros
+    polilineas = [[nodos[linea[0]], nodos[linea[1]]] for linea in sumideros]
+    escribir_shp_polilineas(shpFileSumideros, polilineas, {}, spatial_ref)
+
+    # Escribir shape de vertederos
+    polilineas = [[nodos[linea[0]], nodos[linea[1]]] for linea in vertederos]
+    escribir_shp_polilineas(shpFileVertederos, polilineas, {}, spatial_ref)
+
+    print arcpy.GetMessages()
 
     # Write list files
     saveOnFile(nodos, "nodos")
@@ -236,27 +263,23 @@ def mainReadStreets():
     tF.write("Finalizado proceso de creado de calles\n")
     tF.close()
 
+
 def mainCreateSubcatchments():
     print "Proceso de creado de cuencas\n"
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
 
-    gp.workspace = workspace
-    gp.toolbox = "analysis"
-    print "Creando polígonos de thiessen"
-    gp.createthiessenpolygons(shpFileCentros, subcuencasShpFile, "ALL")
-    print "Cortando los polígonos de thiessen con la cuenca"
-    gp.Clip_analysis(subcuencasShpFile, shpFileCuenca, subcuencasClipShpFile)
-    print "Calculando las areas"
-    gp.CalculateAreas_stats(subcuencasClipShpFile, subcuencasAreaShpFile)
+    create_thiessen_polygons(shpFileCentros, subcuencasShpFile)
+
+    clip_feature(subcuencasShpFile, shpFileCuenca, subcuencasClipShpFile)
+
+    calculate_areas(subcuencasClipShpFile, subcuencasAreaShpFile)
+
     print "Finalizado proceso de creado de cuencas\n"
+
 
 def mainReadSubcatchments():
     print "Proceso de lecturade cuencas\n"
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
 
-    subcuencas = readPolygonShp(gp, subcuencasAreaShpFile, ["Input_FID", "F_AREA"])
+    subcuencas = leer_shp_poligonos(subcuencasAreaShpFile, ["Input_FID", "F_AREA"])
     subcuencas.sort(key=lambda x: float(x[1]))
 
     # Completar si falta alguna y eliminar duplicadas si existieran
@@ -279,13 +302,11 @@ def mainReadSubcatchments():
 
 def mainSampleNodeData():
     print "Proceso de muestreo de datos...\n"
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
 
-    nodosElev = sampleRasterOnNodes(gp, shpFileNodos, rasterFileDEM, "mde")
-    nodosSlope = sampleRasterOnNodes(gp, shpFileNodos, rasterFileSlope, "pend_cte")
-    nodosCoeficiente = sampleRasterOnNodes(gp, shpFileNodos, rasterFileCoeficiente, "sd_lluvia")
-    nodosImpermeabilidad = sampleRasterOnNodes(gp, shpFileNodos, rasterFileImpermeabilidad, "Raster_Imp")
+    nodosElev = sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
+    nodosSlope = sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
+    nodosCoeficiente = sample_raster_on_nodes(shpFileNodos, rasterFileCoeficiente)
+    nodosImpermeabilidad = sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
 
     # Bajar nodos arroyo
     #nodos = readFromFile('nodos')
@@ -297,15 +318,13 @@ def mainSampleNodeData():
     saveOnFile(nodosSlope, "nodosSlope")
     saveOnFile(nodosCoeficiente, "nodosCoeficiente")
     saveOnFile(nodosImpermeabilidad, "nodosImpermeabilidad")
-    print "Finalizado proceso de generación de muestreo\n"
+    print "Finalizado proceso de generacion de muestreo\n"
 
 
 def mainCreateOutfallNodes():
-    print "Proceso de generación de nodos outfall...\n"
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
+    print "Proceso de generacion de nodos outfall...\n"
 
-    posicionesNodosOutfall = readPointShp(gp, nodosOutfallShpFile)
+    posicionesNodosOutfall = leer_shp_puntos(nodosOutfallShpFile)
 
     nodos = readFromFile('nodos')
     nodosElev = readFromFile('nodosElev')
@@ -315,7 +334,7 @@ def mainCreateOutfallNodes():
     saveOnFile(nodosOutfall, "nodosOutfall")
     saveOnFile(nodosOutfallElev, "nodosOutfallElev")
     saveOnFile(lineasOutfall, "lineasOutfall")
-    print "Finalizado proceso de generación de nodos outfall\n"
+    print "Finalizado proceso de generacion de nodos outfall\n"
 
 
 def mainCalculateInvertOffsets():
@@ -413,10 +432,17 @@ def mainReadSWMMResultsDepths():
         if (nodeMaxDepths[i] < 0):
             nodeMaxDepths[i] = 0
 
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
+    # Conseguir la referencia geografica
+    spatial_ref = leer_spatial_reference(shpFileCalles)
 
-    writeResults(gp, workspace + "/" + nodesDepthShpFile, nodos, nodeMaxDepths)
+    # Escribir shape con las profundidades maximas
+    campos = {"depth" : [depth for depth in nodeMaxDepths]}
+    escribir_shp_puntos(workspace + "/" + nodesDepthShpFile, nodos, campos, spatial_ref)
+
+    # Escribir shape con las profundidades en cada paso de tiempo
+    for i, dataline in enumerate(data):
+        campos = {"depth" : [dataline[i][1] for i in range(1,len(dataline))]}
+        escribir_shp_puntos(workspace + "/nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
 
 
 def mainReadSWMMResultsElevations():
@@ -438,18 +464,22 @@ def mainReadSWMMResultsElevations():
     for i in xrange(0,len(nodos)):
         nodeMaxElev.append(max([d[i+1][1] for d  in data]))
         nodeMaxElev[i] = nodeMaxElev[i] + nodosInvElevOffset[i]
-        if (nodeMaxElev[i] < 0):
-            nodeMaxElev[i] = 0
-        nodeMaxElev[i] = nodeMaxElev[i] + nodosElev[i]
 
-    gp = arcgisscripting.create(9.3)
-    gp.OverWriteOutput = 1
+    # Conseguir la referencia geografica
+    spatial_ref = leer_spatial_reference(shpFileCalles)
 
-    writeResults(gp, workspace + "/" + nodesElevationShpFile, nodos, nodeMaxDepths)
+    # Escribir shape con las profundidades maximas
+    campos = {"elev" : [elev for elev in nodeMaxElevs]}
+    escribir_shp_puntos(workspace + "/" + nodesElevationShpFile, nodos, campos, spatial_ref)
+
+    # Escribir shape con las profundidades en cada paso de tiempo
+    for i, dataline in enumerate(data):
+        campos = {"elev" : [dataline[i][1] + nodosInvElevOffset[i-1] for i in range(1,len(dataline))]}
+        escribir_shp_puntos(workspace + "/nodeElev%04d.shp" % i, nodos, campos, spatial_ref)
 
 
 def mainCreateRainGages():
-    print "Leyendo pluviómetro..."
+    print "Leyendo pluviometro..."
     iFile = open(gageFileName, "r")
     lineas = iFile.readlines()
     iFile.close()
@@ -470,426 +500,89 @@ def mainCreateRainGages():
     print "Estaciones listas"
 
 
+def mainCalculateDeadDepths():
+    nodos = readFromFile('nodos')
+    nodosElev = readFromFile('nodosElev')
+    nodosInvElevOffset = readFromFile('nodosInvElevOffset')
+    lineas = readFromFile('lineas')
+    sumideros = readFromFile('sumideros')
+    vertederos = readFromFile('vertederos')
+    lineasOutfall = readFromFile('lineasOutfall')
 
 
-
-
-
-
-
-
-def saveOnFile( data, name ):
-    oF = open(workspace + "/" + name + ".pkl", 'wb')
-    pickle.dump(data, oF)
-    oF.close()
-
-
-def readFromFile( name ):
-    iF = open(workspace + "/" + name + ".pkl", 'rb')
-    data = pickle.load(iF)
-    iF.close()
-    return data
-
-
-def dist(p0, p1):
-    return ((p0[0]-p1[0])**2+(p0[1]-p1[1])**2)**0.5
-
-
-def distSq(p0, p1):
-    return ((p0[0]-p1[0])**2+(p0[1]-p1[1])**2)
-
-
-def interpolate(p0, p1, alpha):
-    return [p0[0] + (p1[0]-p0[0])*alpha, p0[1] + (p1[1]-p0[1])*alpha]
-
-
-def insertPoints(puntos, distMax = 50):
+    tirantes = [100 for nodo in nodos]
+    print lineasOutfall
     i = 0
-    while (i<len(puntos)-1):
-        p0 = puntos[i]
-        p1 = puntos[i+1]
-        largo = dist(p0, p1)
-        if (largo > distMax):
-            numTramos = int(math.floor(largo / distMax + 1))
-            largoNuevo = largo / numTramos
-            for j in xrange(1,numTramos):
-                puntos.insert(i+j, interpolate(p0, p1, float(j)/float(numTramos)))
-            i += numTramos
-        else:
-            i += 1
+    maxbajada = 100
+    while maxbajada > 0.01:
+        maxbajada = 0
+        for linea in lineasOutfall:
+            nodo0 = linea[0]
+            tirantes[nodo0] = 0
 
+        def igualar(nodo0, nodo1):
+            elev0 = nodosElev[nodo0] + tirantes[nodo0]
+            elev1 = nodosElev[nodo1] + tirantes[nodo1]
+            if elev0 <= elev1:
+                elev11 = max(nodosElev[nodo1], elev0)
+                tirantes[nodo1] = elev11 - nodosElev[nodo1]
+                bajada = elev1 - elev11
+            else:
+                elev01 = max(nodosElev[nodo0], elev1)
+                tirantes[nodo0] = elev01 - nodosElev[nodo0]
+                bajada = elev0 - elev01
 
-def removePoints(puntos, distMax = 25):
-    i = 1
-    while (i<len(puntos)-1):
-        p2 = puntos[i-1]
-        p0 = puntos[i]
-        p1 = puntos[i+1]
-        largoAnterior = dist(p2, p0)
-        largoSiguiente = dist(p0, p1)
-        if largoAnterior < distMax and largoSiguiente < distMax and p0[-1] != "snapped":
-            puntos.pop(i)
-        else:
-            i += 1
+            return bajada
 
+        for linea in lineas:
+            nodo0, nodo1 = linea[0], linea[1]
+            bajada = igualar(nodo0, nodo1)
+            maxbajada = max(maxbajada, bajada)
 
-def atraviesaArroyo(p0, p1, nodos, lineas):
-    for linea in lineas:
-        if (linea[2] == "arroyo"):
-            if (intersect(p0, p1, nodos[linea[0]], nodos[linea[1]])):
-                return linea[0]
-        if (linea[2] == "calle"):
-            break
+        for linea in sumideros:
+            nodo0, nodo1 = linea[0], linea[1]
+            bajada = igualar(nodo0, nodo1)
+            maxbajada = max(maxbajada, bajada)
 
-    return -1
+        for linea in vertederos:
+            nodo0, nodo1 = linea[0], linea[1]
+            bajada = igualar(nodo0, nodo1)
+            maxbajada = max(maxbajada, bajada)
 
-
-def ccw(A,B,C):
-    return (C[1]-A[1])*(B[0]-A[0]) > (B[1]-A[1])*(C[0]-A[0])
-
-
-def intersect(A,B,C,D):
-    return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
-
-
-def addNode(nodos, punto, tipo = "esquina", tolSq = 30):
-    for (i, nodo) in enumerate(nodos):
-        if distSq(nodo, punto) < tolSq:
-            if nodo[2] == "conducto":
-                # Si llega al menos un arroyo a un nodo conducto, pasa a ser nodo arroyo
-                if tipo == "arroyo":
-                    nodos[i][2] = "arroyo"
-                    return i
-                elif tipo == "conducto":
-                    return i
-                # Si se quiere crear un nodo esquina cerca de uno conducto, no los une
-                elif tipo == "esquina":
-                    continue
-
-            elif nodo[2] == "esquina":
-                if tipo == "arroyo":
-                    #Esto no debería ocurrir, porque los arroyos se crean antes que las esquinas
-                    return i
-                elif tipo == "conducto":
-                    #Esto no debería ocurrir, porque los arroyos se crean antes que las esquinas
-                    continue
-                elif tipo == "esquina":
-                    return i
-
-            elif nodo[2] == "arroyo":
-                if tipo == "arroyo":
-                    return i
-                elif tipo == "conducto":
-                    return i
-                elif tipo == "esquina":
-                    return i
-
-
-    # Si no hay nodos cercanos, agregar uno
-    punto.append(tipo)
-    nodos.append(punto)
-    return len(nodos)-1;
-
-
-def writeNodesShp(gp, nodesFile, nodos):
-    print "Escribiendo shape de nodos..."
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
-
-        desc = gp.Describe(templateShpFileNodos)
-        sr = desc.SpatialReference
-
-        outPath, outFC = os.path.split(nodesFile)
-        gp.CreateFeatureClass(outPath, outFC, "Point", templateShpFileNodos, "", "", sr)
-
-        iCur = gp.InsertCursor(nodesFile)
-        pnt = gp.CreateObject("Point")
-
-        for (i, nodo) in enumerate(nodos):
-            pnt.x, pnt.y = nodo[0], nodo[1]
-            #print "Escribiendo ", i, pnt.x, pnt.y
-            iFeat = iCur.NewRow()
-            iFeat.SetValue("Shape", pnt)
-            iCur.InsertRow(iFeat)
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de nodos"
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
-
-
-def writeLineasShp(gp, lineasFile, nodos, lineas):
-    print "Escribiendo shape de lineas..."
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
-
-        desc = gp.Describe(templateShpFileLineas)
-        sr = desc.SpatialReference
-
-        outPath, outFC = os.path.split(lineasFile)
-        gp.CreateFeatureClass(outPath, outFC, "Polyline", templateShpFileLineas, "", "", sr)
-
-        iCur = gp.InsertCursor(lineasFile)
-        pnt = gp.CreateObject("Point")
-        lineArray = gp.CreateObject("Array")
-
-        for (i, linea) in enumerate(lineas):
-            nodo = nodos[linea[0]]
-            pnt.x, pnt.y = nodo[0], nodo[1]
-            lineArray.add(pnt)
-            nodo = nodos[linea[1]]
-            pnt.x, pnt.y = nodo[0], nodo[1]
-            lineArray.add(pnt)
-
-            #print "Escribiendo ", i, pnt.x, pnt.y
-            iFeat = iCur.NewRow()
-            iFeat.shape = lineArray
-            iFeat.SetValue("nodo0", linea[0])
-            iFeat.SetValue("nodo1", linea[1])
-            iFeat.SetValue("tipo", linea[2])
-            iFeat.SetValue("ancho", linea[3])
-            #iFeat.SetValue("alto", linea[4])
-            iCur.InsertRow(iFeat)
-            lineArray.RemoveAll()
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de lineas"
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
-
-def writeSumiderosShp(gp, sumiderosFile, nodos, sumideros):
-    print "Escribiendo shape de sumideros..."
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
-
-        desc = gp.Describe(templateShpFileLineas)
-        sr = desc.SpatialReference
-
-        outPath, outFC = os.path.split(sumiderosFile)
-        gp.CreateFeatureClass(outPath, outFC, "Polyline", templateShpFileLineas, "", "", sr)
-
-        iCur = gp.InsertCursor(sumiderosFile)
-        pnt = gp.CreateObject("Point")
-        lineArray = gp.CreateObject("Array")
-
-        for (i, sumidero) in enumerate(sumideros):
-            nodo = nodos[sumidero[0]]
-            pnt.x, pnt.y = nodo[0], nodo[1]
-            lineArray.add(pnt)
-            nodo = nodos[sumidero[1]]
-            pnt.x, pnt.y = nodo[0], nodo[1]
-            lineArray.add(pnt)
-
-            #print "Escribiendo ", i, pnt.x, pnt.y
-            iFeat = iCur.NewRow()
-            iFeat.shape = lineArray
-            iCur.InsertRow(iFeat)
-            lineArray.RemoveAll()
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de sumideros"
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
-
-def sampleRasterOnNodes(gp, nodesFile, rasterFile, fieldName):
-    print "Muestreando el raster..."
-    gp.workspace = workspace
-    gp.CheckOutExtension("Spatial")
-    tableFile = "table.dbf"
-    gp.Sample_sa(rasterFile, nodesFile, tableFile, "BILINEAR")
-
-    print "Leyendo los valores muestreandos..."
-    valueList = []
-    #head, fieldName = os.path.split(rasterFile)
-
-    sRow, sCur = None, None
-    sCur = gp.SearchCursor( tableFile )
-
-    sRow = sCur.Next()
-    i=0
-    while (sRow):
-        valor = sRow.GetValue(fieldName)
-        valueList.append( valor )
-        sRow = sCur.Next()
         i += 1
 
-    print "Finalizado el muestreo de valores"
-    return valueList
+        print "Iteracion %i - Max Bajada %f" % (i, maxbajada)
 
+    # Conseguir la referencia geografica
+    spatial_ref = leer_spatial_reference(shpFileCalles)
 
-def readPointShp(gp, shpFile, listaCampos = []):
-    resultados = []
-    print "Leyendo shape de puntos ", shpFile
-    try:
-        sRow, sCur, sFeat = None, None, None
-        gp.workspace = workspace
-        shapeName = gp.Describe( shpFile ).ShapeFieldName
-        sCur = gp.SearchCursor( shpFile )
-        sRow = sCur.Next()
-        pnt = gp.CreateObject("Point")
-
-        while (sRow):
-            sFeat = sRow.GetValue(shapeName)
-            pnt = sFeat.GetPart(0)
-            punto = [pnt.x, pnt.y]
-
-            for campo in listaCampos:
-                punto.append( sRow.GetValue(campo) )
-
-            resultados.append(punto)
-            sRow = sCur.Next()
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        if sRow:
-            del sRow
-        if sCur:
-            del sCur
-        if sFeat:
-            del sFeat
-        print "Finalizado de leer shape de puntos"
-        return resultados
-
-
-def readPolylineShp(gp, shpFile, listaCampos = []):
-    resultados = []
-    print "Leyendo shape de polilineas ", shpFile
-    try:
-        sRow, sCur, sFeat = None, None, None
-        gp.workspace = workspace
-        shapeName = gp.Describe( shpFile ).ShapeFieldName
-        sCur = gp.SearchCursor( shpFile )
-        sRow = sCur.Next()
-        pnt = gp.CreateObject("Point")
-
-        while (sRow):
-            sFeat = sRow.GetValue(shapeName)
-
-            partcount = sFeat.PartCount
-            if (partcount == 1):
-                part = sFeat.GetPart(0)
-
-                poly = []
-                puntos = []
-                pnt = part.Next()
-                while pnt:
-                    punto = [pnt.x, pnt.y]
-                    puntos.append(punto)
-                    pnt = part.Next()
-
-                poly.append(puntos)
-                for campo in listaCampos:
-                    poly.append( sRow.GetValue(campo) )
-
-                resultados.append(poly)
-
-            sRow = sCur.Next()
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        if sRow:
-            del sRow
-        if sCur:
-            del sCur
-        if sFeat:
-            del sFeat
-        print "Finalizado de leer shape de polilineas"
-        return resultados
-
-
-def readPolygonShp(gp, shpFile, listaCampos = []):
-    resultados = []
-    print "Leyendo shape de poligonos ", shpFile
-    try:
-        sRow, sCur, sFeat = None, None, None
-        gp.workspace = workspace
-        shapeName = gp.Describe( shpFile ).ShapeFieldName
-        sCur = gp.SearchCursor( shpFile )
-        sRow = sCur.Next()
-        pnt = gp.CreateObject("Point")
-
-        while (sRow):
-            sFeat = sRow.GetValue(shapeName)
-
-            partcount = sFeat.PartCount
-            if (partcount == 1):
-                part = sFeat.GetPart(0)
-
-                poly = []
-                puntos = []
-                pnt = part.Next()
-                while pnt:
-                    punto = [pnt.x, pnt.y]
-                    puntos.append(punto)
-                    pnt = part.Next()
-
-                poly.append(puntos)
-                for campo in listaCampos:
-                    poly.append( sRow.GetValue(campo) )
-
-                resultados.append(poly)
-
-            sRow = sCur.Next()
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        if sRow:
-            del sRow
-        if sCur:
-            del sCur
-        if sFeat:
-            del sFeat
-        print "Finalizado de leer shape de poligonos"
-        return resultados
+    # Escribir shape con las profundidades maximas
+    campos = {
+                "depth" : tirantes,
+                "nelev" : nodosElev
+             }
+    escribir_shp_puntos(workspace + "/" + "nodesProfMuerta.shp", nodos, campos, spatial_ref)
 
 
 def createNodosYLineasOutfall(nodos, nodosElev, posicionesNodosOutfall):
     nodosOutfall = []
     nodosOutfallElev = []
     lineasOutfall = []
+    print posicionesNodosOutfall
+
     for (i, nodo) in enumerate(nodos):
-        # Buscar la posición outfall más cercana
+        # Buscar la posicion outfall mas cercana
         mindist, minj = 50, -1
         for (j, posNO) in enumerate(posicionesNodosOutfall):
             if dist(nodo, posNO) < mindist:
                 mindisdt = dist(nodo, posNO)
                 minj = j
         if minj != -1:
-            nodosOutfall.append(posicionesNodosOutfall[minj])
+            nodosOutfall.append(list(posicionesNodosOutfall[minj]))
             nodosOutfallElev.append(nodosElev[i])
             lineasOutfall.append( [i, len(nodosOutfall)-1, 50] )
+    print nodosOutfall, nodosOutfallElev, lineasOutfall
     return nodosOutfall, nodosOutfallElev, lineasOutfall
-
 
 
 def writeSWMMFile(swmmInputFileName):
@@ -928,7 +621,7 @@ def writeSWMMFile(swmmInputFileName):
     # % del area de la subcuenca en que se almacena el agua en el nodo
     juApondPer = 0.75
 
-    # value of n (i.e., roughness parameter) in Manning’s equation.
+    # value of n (i.e., roughness parameter) in Manning's equation.
     coN = 0.04
     coTapada = 0.3
 
@@ -998,8 +691,8 @@ def writeSWMMFile(swmmInputFileName):
     tF.write("DRY_STEP           00:01:00\n")
     tF.write("ROUTING_STEP       00:00:30\n")
     # Minimum Surface Area - This is a minimum surface area used at nodes when computing changes in water depth. If 0 is entered, then the default value of 12.566 ft2 (1.167 m2) is used. This is the area of a 4-ft diameter manhole. The value entered should be in square feet for US units or square meters for SI units.
-    #tF.write("MIN_SURFAREA       75.54\n") #m2, equivalente a 10 m de diámetro
-    tF.write("MIN_SURFAREA       1.167\n") #m2, equivalente a 10 m de diámetro
+    #tF.write("MIN_SURFAREA       75.54\n") #m2, equivalente a 10 m de diametro
+    tF.write("MIN_SURFAREA       1.167\n") #m2, equivalente a 10 m de diametro
     tF.write("\n")
 
     tF.write("[FILES]\n")
@@ -1295,50 +988,16 @@ def writeSWMMFile(swmmInputFileName):
     tF.close()
 
 
-def writeResults(gp, nodesDepthShpFile, nodos, nodesMaxDepths):
-    print "Escribiendo shape de nodos con profundidades máximas..."
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
-
-        desc = gp.Describe(templateShpFileNodosDepth)
-        sr = desc.SpatialReference
-
-        outPath, outFC = os.path.split(nodesDepthShpFile)
-        gp.CreateFeatureClass(outPath, outFC, "Point", templateShpFileNodosDepth, "", "", sr)
-
-        iCur = gp.InsertCursor(nodesDepthShpFile)
-        pnt = gp.CreateObject("Point")
-
-        for (i, nodo) in enumerate(nodos):
-            pnt.x, pnt.y = nodo[0], nodo[1]
-            #print "Escribiendo ", i, pnt.x, pnt.y
-            iFeat = iCur.NewRow()
-            iFeat.SetValue("Shape", pnt)
-            iFeat.SetValue("Depth", nodesMaxDepths[i])
-            iCur.InsertRow(iFeat)
-
-    except Exception, err:
-        print err.message
-        gp.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de nodos"
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
-
-
-
-
-
-
-
+if __name__ == '__console__' :
+    os.chdir(workspace)
+    mainReadRivers()
 
 if __name__ == '__main__':
+    os.chdir(workspace)
+    gis_init()
+
     # Opciones de corrida
-    print "Qué desea hacer?\n"
+    print "Que desea hacer?\n"
     print " 0 - Leer arroyos\n"
     print " 1 - Leer las calles\n"
     print " 2 - Crear subcuencas a partir de nodos\n"
@@ -1349,10 +1008,11 @@ if __name__ == '__main__':
     print " 7 - (Opcional)Corregir los perfiles de arroyos y conductos usando otro archivo .inp\n"
     print " 8 - Generar archivos de SWMM\n"
     print " 9 - Todo\n"
-    print "10 - Leer resultados y escribir shp con prof. máxima en nodos\n"
-    print "11 - Leer resultados y escribir shp con elevación máxima en nodos\n"
+    print "10 - Leer resultados y escribir shp con prof. maxima en nodos\n"
+    print "11 - Leer resultados y escribir shp con elevacion maxima en nodos\n"
     print "12 - Crear pluviometros\n"
-    x = input("Opción:")
+    print "13 - Analisis de tirantes muertos\n"
+    x = input("Opcion:")
     if (x == 0):
         mainReadRivers()
     elif (x == 1):
@@ -1386,5 +1046,6 @@ if __name__ == '__main__':
         mainReadSWMMResultsElevations()
     elif (x == 12):
         mainCreateRainGages()
-
+    elif (x == 13):
+        mainCalculateDeadDepths()
 

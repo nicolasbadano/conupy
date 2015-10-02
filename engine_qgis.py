@@ -1,20 +1,103 @@
-﻿# GIS functions for ArcGis 10.1
+﻿# GIS functions for QGIS 2.10.1
 
-import arcpy
-from arcpy import env
-from arcpy.sa import *
+from qgis.core import *
+
 import os
+
+default_spatial_reference = None
+arcpy = []
+
+def gis_init():
+    # supply path to where is your qgis installed
+    app = QgsApplication([],True)
+    print app
+    print QgsApplication.setPrefixPath("C:/Program Files/QGIS Pisa", True)
+
+    # load providers
+    print QgsApplication.initQgis()
 
 def crear_datos_temporales():
     return arcpy.CreateScratchName(workspace=arcpy.env.scratchGDB)
+
 
 def leer_spatial_reference(fileName):
     desc = arcpy.Describe(fileName)
     return desc.SpatialReference
 
+
+def leer_shp_puntos(shp_file, lista_campos = []):
+    resultados = []
+    print "Leyendo shape de puntos ", shp_file
+    try:
+        sRow, sCur, sFeat = None, None, None
+        shapeName = arcpy.Describe( shp_file ).ShapeFieldName
+        sCur = arcpy.SearchCursor( shp_file )
+        sRow = sCur.next()
+        pnt = arcpy.CreateObject("Point")
+
+        while (sRow):
+            sFeat = sRow.getValue(shapeName)
+
+            part = sFeat.getPart(0)
+            punto = [pnt.X, pnt.Y]
+
+            punto.append( sRow.getValue(campo) )
+
+            resultados.append(punto)
+            sRow = sCur.next()
+
+    except Exception, err:
+        print err.message
+        arcpy.AddError(err.message)
+
+    finally:
+        if sRow:
+            del sRow
+        if sCur:
+            del sCur
+        if sFeat:
+            del sFeat
+        print "Finalizado de leer shape de puntos."
+        return resultados
+
+
 def leer_shp_polilineas(shp_file, lista_campos = []):
+    layer = QgsVectorLayer(shp_file + "x", "capa1", "ogr")
+
     resultados = []
     print "Leyendo shape de polilineas ", shp_file
+
+    features = layer.getFeatures()
+    for feature in features:
+        geom = feature.geometry()
+        x = geom.asPolyline()
+
+        poly = []
+        puntos = []
+        for p in x:
+            punto = [p[0], p[1]]
+            puntos.append(punto)
+        poly.append(puntos)
+
+        print x
+        # fetch attributes
+        attrs = feature.attributes()
+        # attrs is a list. It contains all the attribute values of this feature
+        print attrs
+
+        for campo in lista_campos:
+            idx = layer.fieldNameIndex(campo)
+            poly.append( feature.attributes()[idx] )
+
+        resultados.append(poly)
+
+    print "Finalizado de leer shape de polilineas."
+    return resultados
+
+
+def leer_shp_poligonos(shp_file, lista_campos = []):
+    resultados = []
+    print "Leyendo shape de poligonos ", shp_file
     try:
         sRow, sCur, sFeat = None, None, None
         shapeName = arcpy.Describe( shp_file ).ShapeFieldName
@@ -33,7 +116,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
                 puntos = []
                 pnt = part.next()
                 while pnt:
-                    punto = (pnt.X, pnt.Y)
+                    punto = [pnt.X, pnt.Y]
                     puntos.append(punto)
                     pnt = part.next()
 
@@ -56,8 +139,9 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
             del sCur
         if sFeat:
             del sFeat
-        print "Finalizado de leer shape de polilineas"
+        print "Finalizado de leer shape de polígonos."
         return resultados
+
 
 def escribir_shp_puntos(fileName, puntos, campos, spatial_reference):
     print "Escribiendo shape de puntos: " + fileName
@@ -67,6 +151,7 @@ def escribir_shp_puntos(fileName, puntos, campos, spatial_reference):
 
         outPath, outFC = os.path.split(fileName)
         arcpy.env.workspace = outPath
+        arcpy.env.OverWriteOutput = True
 
         if not arcpy.Exists(fileName):
             arcpy.CreateFeatureclass_management(outPath, outFC, "Point", None, "", "", spatial_reference)
@@ -103,7 +188,64 @@ def escribir_shp_puntos(fileName, puntos, campos, spatial_reference):
         arcpy.AddError(err.message)
 
     finally:
-        print "Finalizado escribir shape de puntos"
+        print "Finalizado escribir shape de puntos."
+        if iCur:
+            del iCur
+        if iFeat:
+            del iFeat
+
+
+def escribir_shp_polilineas(fileName, polilineas, campos, spatial_reference):
+    print "Escribiendo shape de polilineas: " + fileName
+    try:
+        # Assign empty values to cursor and row objects
+        iCur, iFeat = None, None
+
+        outPath, outFC = os.path.split(fileName)
+        arcpy.env.workspace = outPath
+        arcpy.env.OverWriteOutput = True
+
+        if not arcpy.Exists(fileName):
+            arcpy.CreateFeatureclass_management(outPath, outFC, "Polyline", None, "", "", spatial_reference)
+
+            for nombre in campos:
+                dato = campos[nombre][0]
+                type = ""
+                if isinstance(dato, int):
+                    type = "SHORT"
+                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
+                elif isinstance(dato, float):
+                    type = "FLOAT"
+                    arcpy.AddField_management(fileName, nombre, type, 9, 6, "", "", "NON_NULLABLE")
+                elif isinstance(dato, str):
+                    type = "TEXT"
+                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
+        else:
+            arcpy.DeleteFeatures_management(fileName)
+
+        iCur = arcpy.InsertCursor(fileName)
+        pnt = arcpy.Point()
+        arrayObj = arcpy.Array()
+
+        for (i, polilinea) in enumerate(polilineas):
+            for (j, punto) in enumerate(polilinea):
+                (pnt.X, pnt.Y) = (punto[0], punto[1])
+                arrayObj.add(pnt)
+
+            iFeat = iCur.newRow()
+            iFeat.setValue("Shape", arrayObj)
+            for nombre in campos:
+                iFeat.setValue(nombre, campos[nombre][i])
+
+            iCur.insertRow(iFeat)
+            arrayObj.removeAll()
+
+    except Exception, err:
+        print err.message
+        arcpy.AddError(err.message)
+
+    finally:
+        print "Finalizado escribir shape de polilineas."
         if iCur:
             del iCur
         if iFeat:
@@ -118,6 +260,7 @@ def escribir_shp_poligonos(fileName, poligonos, campos, spatial_reference):
 
         outPath, outFC = os.path.split(fileName)
         arcpy.env.workspace = outPath
+        arcpy.env.OverWriteOutput = True
 
         if not arcpy.Exists(fileName):
             arcpy.CreateFeatureclass_management(outPath, outFC, "Polygon", None, "", "", spatial_reference)
@@ -159,7 +302,7 @@ def escribir_shp_poligonos(fileName, poligonos, campos, spatial_reference):
         arcpy.AddError(err.message)
 
     finally:
-        print "Finalizado escribir shape de polígonos"
+        print "Finalizado escribir shape de polígonos."
         if iCur:
             del iCur
         if iFeat:
@@ -201,5 +344,56 @@ def sample_raster_on_nodes(nodesFile, rasterFile):
         else:
             values[int(row[1]) - 1] = float(row[-1])
 
-    print "Finalizado el muestreo de valores"
+    print "Finalizado el muestreado de valores."
     return values
+
+
+def create_thiessen_polygons(nodesFile, fileName):
+    print "Creando polígonos de Thiessen. Destino: " + fileName
+    try:
+        outPath, outFC = os.path.split(fileName)
+        arcpy.env.workspace = outPath
+        arcpy.env.OverWriteOutput = True
+
+        arcpy.CreateThiessenPolygons_analysis(nodesFile, outFC, "ONLY_FID")
+
+    except Exception, err:
+        print err.message
+        arcpy.AddError(err.message)
+
+    finally:
+        print "Finalizada creación de polígonos."
+
+
+def clip_feature(originalFile, clipPolygonFile, fileName):
+    print "Recortando feature. Destino: " + fileName
+    try:
+        outPath, outFC = os.path.split(fileName)
+        arcpy.env.workspace = outPath
+        arcpy.env.OverWriteOutput = True
+
+        arcpy.Clip_analysis(originalFile, clipPolygonFile, outFC, "")
+
+    except Exception, err:
+        print err.message
+        arcpy.AddError(err.message)
+
+    finally:
+        print "Finalizado el recortado."
+
+
+def calculate_areas(polygonFile, fileName):
+    print "Calculando areas. Destino: " + fileName
+    try:
+        outPath, outFC = os.path.split(fileName)
+        arcpy.env.workspace = outPath
+        arcpy.env.OverWriteOutput = True
+
+        arcpy.CalculateAreas_stats(polygonFile, outFC)
+
+    except Exception, err:
+        print err.message
+        arcpy.AddError(err.message)
+
+    finally:
+        print "Finalizado el cálculo de areas."
