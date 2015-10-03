@@ -1,8 +1,9 @@
 ﻿# GIS functions for QGIS 2.10.1
 
 from qgis.core import *
-
+from PyQt4 import QtCore
 import os
+import processing
 
 default_spatial_reference = None
 arcpy = []
@@ -16,53 +17,45 @@ def gis_init():
     # load providers
     print QgsApplication.initQgis()
 
+
 def crear_datos_temporales():
     return arcpy.CreateScratchName(workspace=arcpy.env.scratchGDB)
 
 
 def leer_spatial_reference(fileName):
-    desc = arcpy.Describe(fileName)
-    return desc.SpatialReference
+    layer = QgsVectorLayer(fileName, "capa1", "ogr")
+    spatial_reference = layer.crs()
+    print spatial_reference
+    return spatial_reference
 
 
 def leer_shp_puntos(shp_file, lista_campos = []):
+    layer = QgsVectorLayer(shp_file, "capa1", "ogr")
+
     resultados = []
     print "Leyendo shape de puntos ", shp_file
-    try:
-        sRow, sCur, sFeat = None, None, None
-        shapeName = arcpy.Describe( shp_file ).ShapeFieldName
-        sCur = arcpy.SearchCursor( shp_file )
-        sRow = sCur.next()
-        pnt = arcpy.CreateObject("Point")
 
-        while (sRow):
-            sFeat = sRow.getValue(shapeName)
+    features = layer.getFeatures()
+    for feature in features:
+        geom = feature.geometry()
+        x = geom.asPoint()
+        punto = [x[0], x[1]]
 
-            part = sFeat.getPart(0)
-            punto = [pnt.X, pnt.Y]
+        # fetch attributes
+        attrs = feature.attributes()
+        # attrs is a list. It contains all the attribute values of this feature
+        for campo in lista_campos:
+            idx = layer.fieldNameIndex(campo)
+            poly.append( attrs[idx] )
 
-            punto.append( sRow.getValue(campo) )
+        resultados.append(punto)
 
-            resultados.append(punto)
-            sRow = sCur.next()
-
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
-
-    finally:
-        if sRow:
-            del sRow
-        if sCur:
-            del sCur
-        if sFeat:
-            del sFeat
-        print "Finalizado de leer shape de puntos."
-        return resultados
+    print "Finalizado de leer shape de puntos."
+    return resultados
 
 
 def leer_shp_polilineas(shp_file, lista_campos = []):
-    layer = QgsVectorLayer(shp_file + "x", "capa1", "ogr")
+    layer = QgsVectorLayer(shp_file, "capa1", "ogr")
 
     resultados = []
     print "Leyendo shape de polilineas ", shp_file
@@ -77,17 +70,18 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         for p in x:
             punto = [p[0], p[1]]
             puntos.append(punto)
+
+        if len(puntos) < 2:
+            continue
+
         poly.append(puntos)
 
-        print x
         # fetch attributes
         attrs = feature.attributes()
         # attrs is a list. It contains all the attribute values of this feature
-        print attrs
-
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
-            poly.append( feature.attributes()[idx] )
+            poly.append( attrs[idx] )
 
         resultados.append(poly)
 
@@ -96,290 +90,208 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
 
 
 def leer_shp_poligonos(shp_file, lista_campos = []):
+    layer = QgsVectorLayer(shp_file, "capa1", "ogr")
+
     resultados = []
     print "Leyendo shape de poligonos ", shp_file
-    try:
-        sRow, sCur, sFeat = None, None, None
-        shapeName = arcpy.Describe( shp_file ).ShapeFieldName
-        sCur = arcpy.SearchCursor( shp_file )
-        sRow = sCur.next()
-        pnt = arcpy.CreateObject("Point")
 
-        while (sRow):
-            sFeat = sRow.getValue(shapeName)
+    features = layer.getFeatures()
+    for feature in features:
+        geom = feature.geometry()
+        x = geom.asPolygon()
 
-            partcount = sFeat.partCount
-            if (partcount == 1):
-                part = sFeat.getPart(0)
+        poly = []
+        puntos = []
 
-                poly = []
-                puntos = []
-                pnt = part.next()
-                while pnt:
-                    punto = [pnt.X, pnt.Y]
-                    puntos.append(punto)
-                    pnt = part.next()
+        # Keep only the first ring (e.g. no holes)
+        if len(x) < 1:
+            continue
 
-                poly.append(puntos)
-                for campo in lista_campos:
-                    poly.append( sRow.getValue(campo) )
+        for p in x[0]:
+            punto = [p[0], p[1]]
+            puntos.append(punto)
 
-                resultados.append(poly)
+        if len(puntos) < 2:
+            continue
 
-            sRow = sCur.next()
+        poly.append(puntos)
 
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
+        # fetch attributes
+        attrs = feature.attributes()
+        # attrs is a list. It contains all the attribute values of this feature
+        for campo in lista_campos:
+            idx = layer.fieldNameIndex(campo)
+            poly.append( attrs[idx] )
 
-    finally:
-        if sRow:
-            del sRow
-        if sCur:
-            del sCur
-        if sFeat:
-            del sFeat
-        print "Finalizado de leer shape de polígonos."
-        return resultados
+        resultados.append(poly)
+
+    print "Finalizado de leer shape de polígonos."
+    return resultados
 
 
 def escribir_shp_puntos(fileName, puntos, campos, spatial_reference):
     print "Escribiendo shape de puntos: " + fileName
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
+    outPath, outFC = os.path.split(fileName)
 
-        outPath, outFC = os.path.split(fileName)
-        arcpy.env.workspace = outPath
-        arcpy.env.OverWriteOutput = True
+    fields = QgsFields()
+    for nombre in campos:
+        dato = campos[nombre][0]
+        type = ""
+        if isinstance(dato, int):
+            fields.append(QgsField(nombre, QtCore.QVariant.Int))
+        elif isinstance(dato, float):
+            fields.append(QgsField(nombre, QtCore.QVariant.Double))
+        elif isinstance(dato, str):
+            fields.append(QgsField(nombre, QtCore.QVariant.String))
 
-        if not arcpy.Exists(fileName):
-            arcpy.CreateFeatureclass_management(outPath, outFC, "Point", None, "", "", spatial_reference)
+    writer = QgsVectorFileWriter(fileName, "CP1250", fields, QGis.WKBPoint, spatial_reference, "ESRI Shapefile")
 
-            for nombre in campos:
-                dato = campos[nombre][0]
-                type = ""
-                if isinstance(dato, int):
-                    type = "SHORT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
-                elif isinstance(dato, float):
-                    type = "FLOAT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, 6, "", "", "NON_NULLABLE")
-                elif isinstance(dato, str):
-                    type = "TEXT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
-        else:
-            arcpy.DeleteFeatures_management(fileName)
+    if writer.hasError() != QgsVectorFileWriter.NoError:
+        print "Error when creating shapefile: ",  writer.errorMessage()
 
-        iCur = arcpy.InsertCursor(fileName)
-        pnt = arcpy.CreateObject("Point")
+    # Add features
+    for (i, punto) in enumerate(puntos):
+        fet = QgsFeature()
 
-        for (i, punto) in enumerate(puntos):
-            (pnt.X, pnt.Y) = (punto[0], punto[1])
-            iFeat = iCur.newRow()
-            iFeat.setValue("Shape", pnt)
-            for nombre in campos:
-                iFeat.setValue(nombre, campos[nombre][i])
+        fet.setGeometry(QgsGeometry.fromPoint(QgsPoint(punto[0], punto[1])))
+        fet.setAttributes([campos[nombre][i] for nombre in campos])
 
-            iCur.insertRow(iFeat)
+        writer.addFeature(fet)
+        del fet
 
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de puntos."
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
+    del writer
+    print "Finalizado escribir shape de puntos."
 
 
 def escribir_shp_polilineas(fileName, polilineas, campos, spatial_reference):
     print "Escribiendo shape de polilineas: " + fileName
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
 
-        outPath, outFC = os.path.split(fileName)
-        arcpy.env.workspace = outPath
-        arcpy.env.OverWriteOutput = True
+    fields = QgsFields()
+    for nombre in campos:
+        dato = campos[nombre][0]
+        type = ""
+        if isinstance(dato, int):
+            fields.append(QgsField(nombre, QtCore.QVariant.Int))
+        elif isinstance(dato, float):
+            fields.append(QgsField(nombre, QtCore.QVariant.Double))
+        elif isinstance(dato, str):
+            fields.append(QgsField(nombre, QtCore.QVariant.String))
 
-        if not arcpy.Exists(fileName):
-            arcpy.CreateFeatureclass_management(outPath, outFC, "Polyline", None, "", "", spatial_reference)
+    writer = QgsVectorFileWriter(fileName, "CP1250", fields, QGis.WKBLineString, spatial_reference, "ESRI Shapefile")
 
-            for nombre in campos:
-                dato = campos[nombre][0]
-                type = ""
-                if isinstance(dato, int):
-                    type = "SHORT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
-                elif isinstance(dato, float):
-                    type = "FLOAT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, 6, "", "", "NON_NULLABLE")
-                elif isinstance(dato, str):
-                    type = "TEXT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
-        else:
-            arcpy.DeleteFeatures_management(fileName)
+    if writer.hasError() != QgsVectorFileWriter.NoError:
+        print "Error when creating shapefile: ",  writer.errorMessage()
 
-        iCur = arcpy.InsertCursor(fileName)
-        pnt = arcpy.Point()
-        arrayObj = arcpy.Array()
+    # Add features
+    for (i, polilinea) in enumerate(polilineas):
+        fet = QgsFeature()
+        puntos = []
+        for (j, punto) in enumerate(polilinea):
+            puntos.append(QgsPoint(punto[0], punto[1]))
 
-        for (i, polilinea) in enumerate(polilineas):
-            for (j, punto) in enumerate(polilinea):
-                (pnt.X, pnt.Y) = (punto[0], punto[1])
-                arrayObj.add(pnt)
+        fet.setGeometry(QgsGeometry.fromPolyline(puntos))
+        fet.setAttributes([campos[nombre][i] for nombre in campos])
 
-            iFeat = iCur.newRow()
-            iFeat.setValue("Shape", arrayObj)
-            for nombre in campos:
-                iFeat.setValue(nombre, campos[nombre][i])
+        writer.addFeature(fet)
+        del fet
 
-            iCur.insertRow(iFeat)
-            arrayObj.removeAll()
-
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de polilineas."
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
+    del writer
+    print "Finalizado escribir shape de polilineas."
 
 
 def escribir_shp_poligonos(fileName, poligonos, campos, spatial_reference):
     print "Escribiendo shape de polígonos: " + fileName
-    try:
-        # Assign empty values to cursor and row objects
-        iCur, iFeat = None, None
 
-        outPath, outFC = os.path.split(fileName)
-        arcpy.env.workspace = outPath
-        arcpy.env.OverWriteOutput = True
+    fields = QgsFields()
+    for nombre in campos:
+        dato = campos[nombre][0]
+        type = ""
+        if isinstance(dato, int):
+            fields.append(QgsField(nombre, QtCore.QVariant.Int))
+        elif isinstance(dato, float):
+            fields.append(QgsField(nombre, QtCore.QVariant.Double))
+        elif isinstance(dato, str):
+            fields.append(QgsField(nombre, QtCore.QVariant.String))
 
-        if not arcpy.Exists(fileName):
-            arcpy.CreateFeatureclass_management(outPath, outFC, "Polygon", None, "", "", spatial_reference)
+    writer = QgsVectorFileWriter(fileName, "CP1250", fields, QGis.WKBPolygon, spatial_reference, "ESRI Shapefile")
 
-            for nombre in campos:
-                dato = campos[nombre][0]
-                type = ""
-                if isinstance(dato, int):
-                    type = "SHORT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
-                elif isinstance(dato, float):
-                    type = "FLOAT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, 6, "", "", "NON_NULLABLE")
-                elif isinstance(dato, str):
-                    type = "TEXT"
-                    arcpy.AddField_management(fileName, nombre, type, 9, "", "", "", "NON_NULLABLE")
-        else:
-            arcpy.DeleteFeatures_management(fileName)
+    if writer.hasError() != QgsVectorFileWriter.NoError:
+        print "Error when creating shapefile: ",  writer.errorMessage()
 
-        iCur = arcpy.InsertCursor(fileName)
-        pnt = arcpy.Point()
-        arrayObj = arcpy.Array()
+    # Add features
+    for (i, polilinea) in enumerate(poligonos):
+        fet = QgsFeature()
+        puntos = []
+        for (j, punto) in enumerate(polilinea):
+            puntos.append(QgsPoint(punto[0], punto[1]))
 
-        for (i, poligono) in enumerate(poligonos):
-            for (j, punto) in enumerate(poligono[0]):
-                (pnt.X, pnt.Y) = (punto[0], punto[1])
-                arrayObj.add(pnt)
+        fet.setGeometry(QgsGeometry.fromPolygon(puntos))
+        fet.setAttributes([campos[nombre][i] for nombre in campos])
 
-            iFeat = iCur.newRow()
-            iFeat.setValue("Shape", arrayObj)
-            for nombre in campos:
-                iFeat.setValue(nombre, campos[nombre][i])
+        writer.addFeature(fet)
+        del fet
 
-            iCur.insertRow(iFeat)
-            arrayObj.removeAll()
-
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
-
-    finally:
-        print "Finalizado escribir shape de polígonos."
-        if iCur:
-            del iCur
-        if iFeat:
-            del iFeat
+    del writer
+    print "Finalizado escribir shape de polígonos."
 
 
 def sample_raster_on_nodes(nodesFile, rasterFile):
-    print "Muestreando el raster..."
+    print "Muestreando el raster:" + rasterFile
 
-    inRasters = [rasterFile]
-    inLocations = nodesFile
-    outTable = arcpy.CreateScratchName(workspace=arcpy.env.scratchGDB)
+    nodesLayer = QgsVectorLayer(nodesFile, "nodeLayer", "ogr")
+    rasterLayer = QgsRasterLayer(rasterFile, "rasterLayer")
 
-    arcpy.CheckOutExtension("Spatial")
-    Sample(inRasters, inLocations, outTable, "NEAREST")
+    bandcount = rasterLayer.bandCount()
 
-    field_list = arcpy.ListFields(outTable)
+    values = []
+    features = nodesLayer.getFeatures()
+    for feature in features:
+        geom = feature.geometry()
+        point = geom.asPoint()
 
-    print "Leyendo los valores muestreandos..."
-    value_list = []
-
-    sRow, sCur = None, None
-    sCur = arcpy.SearchCursor(outTable)
-
-    sRow = sCur.next()
-    i=0
-    while (sRow):
-        valor = [sRow.getValue(field.name) for field in field_list]
-        value_list.append( valor )
-        sRow = sCur.next()
-        i += 1
-
-
-    # Quedarse solo con el valor de la elevación
-    values = [None for v in value_list]
-    for row in value_list:
-        if row[-1] is None:
-            values[int(row[1]) - 1] = None
+        res = rasterLayer.dataProvider().identify(point, QgsRaster.IdentifyFormatValue)
+        if res.isValid():
+            values.append(res.results().values()[0])
         else:
-            values[int(row[1]) - 1] = float(row[-1])
+            values.append(None)
 
     print "Finalizado el muestreado de valores."
     return values
 
 
+
 def create_thiessen_polygons(nodesFile, fileName):
     print "Creando polígonos de Thiessen. Destino: " + fileName
-    try:
-        outPath, outFC = os.path.split(fileName)
-        arcpy.env.workspace = outPath
-        arcpy.env.OverWriteOutput = True
 
-        arcpy.CreateThiessenPolygons_analysis(nodesFile, outFC, "ONLY_FID")
+    pointLayer = QgsVectorLayer(nodesFile, "capa1", "ogr")
+    processing.runalg("qgis:voronoipolygons", pointLayer, 1, fileName)
 
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
-
-    finally:
-        print "Finalizada creación de polígonos."
+    print "Finalizada creación de polígonos."
 
 
 def clip_feature(originalFile, clipPolygonFile, fileName):
     print "Recortando feature. Destino: " + fileName
-    try:
-        outPath, outFC = os.path.split(fileName)
-        arcpy.env.workspace = outPath
-        arcpy.env.OverWriteOutput = True
 
-        arcpy.Clip_analysis(originalFile, clipPolygonFile, outFC, "")
+    originalLayer = QgsVectorLayer(originalFile, "capa1", "ogr")
+    clipLayer = QgsVectorLayer(clipPolygonFile, "capa2", "ogr")
+    processing.runalg("qgis:clip", originalLayer, clipLayer, fileName)
 
-    except Exception, err:
-        print err.message
-        arcpy.AddError(err.message)
+    print "Finalizado el recortado."
 
-    finally:
-        print "Finalizado el recortado."
+
+def read_areas(polygonFile):
+    print "Leyendo areas: " + polygonFile
+
+    layer = QgsVectorLayer(polygonFile, "capa1", "ogr")
+
+    resultados = []
+
+    features = layer.getFeatures()
+    for feature in features:
+        geom = feature.geometry()
+        resultados.append(geom.area())
+
+    return resultados
 
 
 def calculate_areas(polygonFile, fileName):
