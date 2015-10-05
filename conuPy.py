@@ -718,7 +718,7 @@ def mainCreateSWMM(swmmInputFileName):
         else:
             tname = tipo + str(int(ancho)) + "x" + str(int(alto))
             transectas[tname] = [tipo, tname, ancho, alto]
-            list = [name, 'IRREGULAR', tname]
+            list = [name, 'IRREGULAR', tname, 0, 0, 0]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
     for (i, linea) in enumerate(lineasOutfall):
