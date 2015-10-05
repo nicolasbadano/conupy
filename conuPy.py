@@ -887,7 +887,7 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
 
     # Escribir shape con las profundidades en cada paso de tiempo
     for i, dataline in enumerate(data):
-        campos = {"depth" : [dataline[i][1] for i in range(1,len(dataline))]}
+        campos = {"depth" : [dataline[j][1] for j in range(1,len(dataline))]}
         escribir_shp_puntos("nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
 
 
@@ -920,7 +920,7 @@ def mainReadSWMMResultsElevations(swmmOuputFileName):
 
     # Escribir shape con las profundidades en cada paso de tiempo
     for i, dataline in enumerate(data):
-        campos = {"elev" : [dataline[i][1] + nodosInvElevOffset[i-1] for i in range(1,len(dataline))]}
+        campos = {"elev" : [dataline[j][1] + nodosInvElevOffset[j-1] for j in range(1,len(dataline))]}
         escribir_shp_puntos("nodeElev%04d.shp" % i, nodos, campos, spatial_ref)
 
 

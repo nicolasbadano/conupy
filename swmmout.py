@@ -81,7 +81,7 @@ class OutFile:
         self.count_vars_cats = 0
         self.count_vars_nodes = 0
         self.count_vars_links = 0
-        self.count_vars_system = 14
+        self.count_vars_system = 15
         # Start time (a datetime object)
         self.start = None
         # Duration of each timestep (a timedelta object)
@@ -226,7 +226,7 @@ class OutFile:
         self.count_nodes = self.getint()
         self.count_links = self.getint()
         self.count_pollutants = self.getint()
-        self.count_vars_cats = 6 + self.count_pollutants
+        self.count_vars_cats = 8 + self.count_pollutants
         self.count_vars_nodes = 6 + self.count_pollutants
         self.count_vars_links = 5 + self.count_pollutants
 
@@ -298,10 +298,12 @@ class OutFile:
         # will be 'conc TSS'
         self.variables['subcatchments'] = ['rainfall',
                                           'snow depth',
-                                          'losses',
+                                          'evaporation',
+                                          'infiltration',
                                           'runoff',
                                           'groundwater flow',
-                                          'groundwater elevation']
+                                          'groundwater elevation',
+                                          'soil moister']
         self.variables['nodes'] = ['depth',
                                    'head',
                                    'storage',
@@ -311,12 +313,12 @@ class OutFile:
         self.variables['links'] = ['flow',
                                    'depth',
                                    'velocity',
-                                   'Froude',
+                                   'volume',
                                    'capacity']
         self.variables['system'] = ['temperature',
                                     'rainfall',
                                     'snow depth',
-                                    'losses',
+                                    'infiltration',
                                     'runoff',
                                     'dry weather inflow',
                                     'groundwater inflow',
@@ -326,7 +328,8 @@ class OutFile:
                                     'flooding',
                                     'outflow',
                                     'storage',
-                                    'evaporation']
+                                    'evaporation',
+                                    'potential_evaporation']
         for p in self.names['pollutants']:
             for vars in ['subcatchments', 'nodes', 'links']:
                 self.variables[vars].append('conc {0}'.format(p))
@@ -369,6 +372,7 @@ class OutFile:
         ret = tuple()
         for i in range(count):
             days = self.getdouble()
+            print "Days: " + str(days)
             assert days > 0, days
             # SWMM seems to start counting at 1899-12-30
             delta = datetime.timedelta(days=days)
