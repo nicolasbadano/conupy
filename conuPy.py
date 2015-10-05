@@ -891,7 +891,8 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
         campos["elev"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) + nodosElev[j-1] for j in range(1,len(dataline))]
         escribir_shp_puntos("nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
 
-def mainCreateRainGages(gageFileName, gagesFileName):
+
+def mainCreateGenerateRain(gageFileName, gagesFileName):
     print "Leyendo pluviometro..."
     iFile = open(gageFileName, "r")
     lineas = iFile.readlines()
@@ -1032,7 +1033,7 @@ if __name__ == '__main__':
     elif (x == 9):
         mainReadSWMMResultsDepths(defaultSwmmOuputFileName)
     elif (x == 11):
-        mainCreateRainGages(defaultGageFileName, defaultGagesFileName)
+        mainCreateGenerateRain(defaultGageFileName, defaultGagesFileName)
     elif (x == 12):
         mainCalculateDeadDepths()
 
