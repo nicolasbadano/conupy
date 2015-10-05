@@ -54,7 +54,7 @@ defaultSwmmInputFileName    = modelFolder + "conurbano.inp"
 defaultGageFileName         = modelFolder + "lluvia.in"
 defaultGagesFileName        = modelFolder + "pluviom.dat"
 
-swmmOuputFileName           = modelFolder + "conurbano.out"
+defaultSwmmOuputFileName    = modelFolder + "conurbano.out"
 nodesDepthShpFile           = "nodosDepth.shp"
 nodesElevationShpFile       = "nodosElevation.shp"
 
@@ -856,7 +856,7 @@ def mainCreateSWMM(swmmInputFileName):
     print "Finalizado el proceso de escritura de archivo SWMM"
 
 
-def mainReadSWMMResultsDepths():
+def mainReadSWMMResultsDepths(swmmOuputFileName):
     nodos = readFromFile('nodos')
     nodosElev = readFromFile('nodosElev')
     nodosInvElevOffset = readFromFile('nodosInvElevOffset')
@@ -891,7 +891,7 @@ def mainReadSWMMResultsDepths():
         escribir_shp_puntos("nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
 
 
-def mainReadSWMMResultsElevations():
+def mainReadSWMMResultsElevations(swmmOuputFileName):
     nodos = readFromFile('nodos')
     nodosElev = readFromFile('nodosElev')
     nodosInvElevOffset = readFromFile('nodosInvElevOffset')
@@ -1064,9 +1064,9 @@ if __name__ == '__main__':
         mainCalculateInvertOffsets()
         mainCreateSWMM(defaultSwmmInputFileName)
     elif (x == 9):
-        mainReadSWMMResultsDepths()
+        mainReadSWMMResultsDepths(defaultSwmmOuputFileName)
     elif (x == 10):
-        mainReadSWMMResultsElevations()
+        mainReadSWMMResultsElevations(defaultSwmmOuputFileName)
     elif (x == 11):
         mainCreateRainGages(defaultGageFileName, defaultGagesFileName)
     elif (x == 12):
