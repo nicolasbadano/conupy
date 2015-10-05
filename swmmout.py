@@ -230,6 +230,7 @@ class OutFile:
         self.count_vars_nodes = 6 + self.count_pollutants
         self.count_vars_links = 5 + self.count_pollutants
 
+
         # Read the footer information as follows:
         # - the byte position where the Object ID Names section begins
         # - the byte position where the Object Properties section begins
@@ -372,7 +373,7 @@ class OutFile:
         ret = tuple()
         for i in range(count):
             days = self.getdouble()
-            print "Days: " + str(days)
+            print "\tswmmout reading date: " + str(days)
             assert days > 0, days
             # SWMM seems to start counting at 1899-12-30
             delta = datetime.timedelta(days=days)

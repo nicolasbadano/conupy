@@ -53,10 +53,7 @@ subcuencasAreaShpFile       = "subcuencasArea.shp"
 defaultSwmmInputFileName    = modelFolder + "conurbano.inp"
 defaultGageFileName         = modelFolder + "lluvia.in"
 defaultGagesFileName        = modelFolder + "pluviom.dat"
-
 defaultSwmmOuputFileName    = modelFolder + "conurbano.out"
-nodesDepthShpFile           = "nodosDepth.shp"
-nodesElevationShpFile       = "nodosElevation.shp"
 
 # Numero de Gages
 numGages = 21
@@ -882,47 +879,17 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     spatial_ref = leer_spatial_reference(shpFileNodos)
 
     # Escribir shape con las profundidades maximas
-    campos = {"depth" : [depth for depth in nodeMaxDepths]}
-    escribir_shp_puntos(workspace + "/" + nodesDepthShpFile, nodos, campos, spatial_ref)
+    campos = OrderedDict()
+    campos["depth"] = [maxDepth for maxDepth in nodeMaxDepths]
+    campos["elev"] = [maxDepth + nodosElev[j] for j, maxDepth in enumerate(nodeMaxDepths)]
+    escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", nodos, campos, spatial_ref)
 
     # Escribir shape con las profundidades en cada paso de tiempo
     for i, dataline in enumerate(data):
-        campos = {"depth" : [dataline[j][1] for j in range(1,len(dataline))]}
+        campos = OrderedDict()
+        campos["depth"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) for j in range(1,len(dataline))]
+        campos["elev"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) + nodosElev[j-1] for j in range(1,len(dataline))]
         escribir_shp_puntos("nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
-
-
-def mainReadSWMMResultsElevations(swmmOuputFileName):
-    nodos = readFromFile('nodos')
-    nodosElev = readFromFile('nodosElev')
-    nodosInvElevOffset = readFromFile('nodosInvElevOffset')
-
-    print "Numero de nodos: ", len(nodos)
-
-    outfile = swmmout.open(swmmOuputFileName)
-
-    query_vars = ['depth']
-    query_nodes = []
-    for i in xrange(0,len(nodos)):
-        query_nodes.append( 'NODO'+str(i) )
-    data = outfile.get_values('nodes', query_nodes, query_vars)
-
-    nodeMaxElev = []
-    for i in xrange(0,len(nodos)):
-        nodeMaxElev.append(max([d[i+1][1] for d  in data]))
-        nodeMaxElev[i] = nodeMaxElev[i] + nodosInvElevOffset[i]
-
-    # Conseguir la referencia geografica
-    spatial_ref = leer_spatial_reference(shpFileNodos)
-
-    # Escribir shape con las profundidades maximas
-    campos = {"elev" : [elev for elev in nodeMaxElevs]}
-    escribir_shp_puntos(workspace + "/" + nodesElevationShpFile, nodos, campos, spatial_ref)
-
-    # Escribir shape con las profundidades en cada paso de tiempo
-    for i, dataline in enumerate(data):
-        campos = {"elev" : [dataline[j][1] + nodosInvElevOffset[j-1] for j in range(1,len(dataline))]}
-        escribir_shp_puntos("nodeElev%04d.shp" % i, nodos, campos, spatial_ref)
-
 
 def mainCreateRainGages(gageFileName, gagesFileName):
     print "Leyendo pluviometro..."
@@ -1034,8 +1001,7 @@ if __name__ == '__main__':
     print " 6 - (Opcional)Corregir los perfiles de arroyos y conductos usando otro archivo .inp"
     print " 7 - Generar archivos de SWMM"
     print " 8 - Todo"
-    print " 9 - Leer resultados y escribir shp con prof. maxima en nodos"
-    print "10 - Leer resultados y escribir shp con elevacion maxima en nodos"
+    print " 9 - Leer resultados y escribir shp con profundidad y elevacion en nodos"
     print "11 - Crear pluviometros"
     print "12 - Analisis de tirantes muertos"
     x = input("Opcion:")
@@ -1065,8 +1031,6 @@ if __name__ == '__main__':
         mainCreateSWMM(defaultSwmmInputFileName)
     elif (x == 9):
         mainReadSWMMResultsDepths(defaultSwmmOuputFileName)
-    elif (x == 10):
-        mainReadSWMMResultsElevations(defaultSwmmOuputFileName)
     elif (x == 11):
         mainCreateRainGages(defaultGageFileName, defaultGagesFileName)
     elif (x == 12):
