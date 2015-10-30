@@ -586,7 +586,7 @@ def mainCreateSWMM(swmmInputFileName):
         numNodo = centro[2]
         coef = int(nodosCoeficiente[numNodo])
         gageName = 'GAGE' + str(coef - (coef%(100/(numGages-1))))
-        list = ['CUENCA'+str(i), gageName, 'NODO'+str(numNodo), "%.3f" % (subcuencas[i][2]/10000), "%.3f" % nodosImpermeabilidad[numNodo], "%.3f" % (nodosLongitudLineas[numNodo]/2), "%.3f" % (nodosSlope[numNodo]), "%.3f" % (subcuencas[i][2]**0.5)]
+        list = ['CUENCA'+str(i), gageName, 'NODO'+str(numNodo), "%.3f" % (float(subcuencas[i][2])/10000.0), "%.3f" % nodosImpermeabilidad[numNodo], "%.3f" % (nodosLongitudLineas[numNodo]/2), "%.3f" % (nodosSlope[numNodo]), "%.3f" % (subcuencas[i][2]**0.5)]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
