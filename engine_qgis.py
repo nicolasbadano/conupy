@@ -46,7 +46,8 @@ def leer_shp_puntos(shp_file, lista_campos = []):
         # attrs is a list. It contains all the attribute values of this feature
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
-            poly.append( attrs[idx] )
+            val = attrs[idx] if idx != -1 else None
+            poly.append(val)
 
         resultados.append(punto)
 
@@ -81,7 +82,8 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         # attrs is a list. It contains all the attribute values of this feature
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
-            poly.append( attrs[idx] )
+            val = attrs[idx] if idx != -1 else None
+            poly.append(val)
 
         resultados.append(poly)
 
@@ -121,7 +123,8 @@ def leer_shp_poligonos(shp_file, lista_campos = []):
         # attrs is a list. It contains all the attribute values of this feature
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
-            poly.append( attrs[idx] )
+            val = attrs[idx] if idx != -1 else None
+            poly.append(val)
 
         resultados.append(poly)
 
