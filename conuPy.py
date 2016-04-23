@@ -29,7 +29,8 @@ workspace                        = dataFolder + "ws"
 modelFolder                      = dataFolder + "Modelo/"
 
 # Archivos de entrada
-defaultShpFileArroyos            = dataFolder + "Arroyos/Arroyos2.shp"
+defaultShpFileDrainageOriginal   = dataFolder + "Arroyos/Arroyos2.shp"
+defaultShpFileDrainagePrepared   = dataFolder + "Arroyos/Arroyos2Preparados.shp"
 defaultShpFileCalles             = dataFolder + "Calles/Calles_Recortado2.shp"
 defaultShpFileCuenca             = dataFolder + "Cuenca/Cuencas_Laferrere.shp"
 defaultShpFileNodosBorde         = dataFolder + "NodosBorde/NodosBorde.shp"
@@ -42,6 +43,7 @@ defaultRasterFileImpermeabilidad = dataFolder + "Impermeabilidad/Imp"
 swmmCorregirArroyosFileName  = modelFolder + "conurbano_3.inp"
 
 # Output fles
+shpFileNodesDrainageNetwork = "nodesDrainageNetwork.shp"
 shpFileNodos                = "nodos.shp"
 shpFileCentros              = "centros.shp"
 shpFileLineas               = "lineas.shp"
@@ -73,68 +75,154 @@ def mainCleanWorkspace(workspace):
     print "Finalizado el limpiado del directorio de trabajo."
 
 
-def mainReadRivers(shpFileArroyos):
-    print "Proceso de creado de arroyos..."
+def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared, rasterFileDEM):
+    print "STARTED: Drainage network preparation"
 
-    # Leer arroyos
-    arroyos = leer_shp_polilineas(shpFileArroyos, ['Ancho', 'Alto', 'Tipo'])
+    # Read the original drainage network
+    streams = leer_shp_polilineas(shpFileDrainageOriginal, ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+    spatial_ref = leer_spatial_reference(shpFileDrainageOriginal)
 
-    # Dividir los subtramos en longitudes menores a 100m
-    for arroyo in arroyos:
-        insertPoints(arroyo[0], 100)
+    # Write a shape file with the nodes of the network
+    nodesDrainageNetwork = []
+    for stream in streams:
+        nodesDrainageNetwork.append(stream[0][0])
+        nodesDrainageNetwork.append(stream[0][-1])
+    escribir_shp_puntos(shpFileNodesDrainageNetwork, nodesDrainageNetwork, {}, spatial_ref)
 
-    # Hacer coincidir los nodos extremos de los arroyos con nodos intermedios cercanos de otros arroyos
-    for arroyo in arroyos:
-        def snap(p, arroyo, arroyos):
-            for arroyo2 in arroyos:
-                if (arroyo != arroyo2):
-                    mindistSq, minj = 50*50, -1
-                    for (j, p2) in enumerate(arroyo2[0]):
-                        dSq = distSq(p, p2)
-                        if dSq < mindistSq:
-                            mindistSq = dSq
-                            minj = j
-                    if minj != -1:
-                        arroyo2[0][minj].append("snapped")
-                        return arroyo2[0][minj]
+    # Sample the terrain on the nodes
+    nodesTerrainLevels = sample_raster_on_nodes(shpFileNodesDrainageNetwork, rasterFileDEM)
+
+    # Min Coverage
+    minCoverage = 0.3
+
+    # Prepare the drainage network elevations base on available data for each node
+    inode = 0
+    for stream in streams:
+        points, w, h, typ, depthIni, depthFin, levelIni, levelFin = stream
+        if w is None:
+            print "ERROR: Missing w value on stream"
+            return
+        if h is None:
+            print "ERROR: Missing h value on stream"
+            return
+        if typ is None:
+            print "ERROR: Missing type value on stream"
+            return
+        if levelIni is None:
+            if depthIni is None:
+                if str(typ).lower() in ["entubado", "conducto", "conduit"]:
+                    depthIni = h + minCoverage
+                else:
+                    depthIni = h
+            levelIni = nodesTerrainLevels[inode] - depthIni
+        else:
+            depthIni = nodesTerrainLevels[inode] - levelIni
+
+        if levelFin is None:
+            if depthFin is None:
+                if str(typ).lower() in ["entubado", "conducto", "conduit"]:
+                    depthFin = h + minCoverage
+                else:
+                    depthFin = h
+            levelFin = nodesTerrainLevels[inode+1] - depthFin
+        else:
+            depthFin = nodesTerrainLevels[inode+1] - levelFin
+
+        stream[4], stream[5], stream[6], stream[7] = depthIni, depthFin, levelIni, levelFin
+        inode += 2
+
+    # Calculate length of each stream
+    for stream in streams:
+        length = sum(dist(p0,p1) for p0, p1 in pairwise(stream[0]))
+        stream.append(length)
+
+    # Write the prepared drainage network
+    polylines = [stream[0] for stream in streams]
+    fields = OrderedDict()
+    fields["w"]        = [stream[1] for stream in streams]
+    fields["h"]        = [stream[2] for stream in streams]
+    fields["type"]     = [str(stream[3]) for stream in streams]
+    fields["depthIni"] = [stream[4] for stream in streams]
+    fields["depthFin"] = [stream[5] for stream in streams]
+    fields["levelIni"] = [stream[6] for stream in streams]
+    fields["levelFin"] = [stream[7] for stream in streams]
+    fields["slope"]    = [(stream[6] - stream[7]) / stream[8] for stream in streams]
+    escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
+
+    print "FINISHED: Drainage network preparation"
+
+
+def mainReadDrainageNetwork(shpFileDrainagePrepared):
+    print "STARTED: Drainage network construction"
+
+    # Read the prepared drainage network
+    streams = leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+
+    # Subdivide the streams in spans shorter than 100m
+    for stream in streams:
+        insertPoints(stream[0], 100)
+
+    # Snap the end nodes of each stream to nearby nodes of other streams
+    for stream in streams:
+        def snap(p, stream, streams):
+            for streamo in streams:
+                if (stream == streamo):
+                    continue
+                mindistSq, minj = 50*50, -1
+                for (j, p2) in enumerate(streamo[0]):
+                    dSq = distSq(p, p2)
+                    if dSq < mindistSq:
+                        mindistSq = dSq
+                        minj = j
+                if minj == -1:
+                    continue
+                streamo[0][minj].append("snapped")
+                return streamo[0][minj]
             return p
 
-        arroyo[0][0]  = snap(arroyo[0][0],  arroyo, arroyos)
-        arroyo[0][-1] = snap(arroyo[0][-1], arroyo, arroyos)
+        stream[0][0]  = snap(stream[0][0],  stream, streams)
+        stream[0][-1] = snap(stream[0][-1], stream, streams)
 
 
-    # Unir subtramos consecutivos de longitudes menores a 75m que cuyo nodo central no es "snapped"
-    for arroyo in arroyos:
-        removePoints(arroyo[0], 75)
+    # Join streams spans shorter than 75m unless they've been "snapped"
+    for stream in streams:
+        removePoints(stream[0], 75)
 
-    for arroyo in arroyos:
-        puntos, ancho, alto, tipo = arroyo[0], arroyo[1], arroyo[2], arroyo[3]
-        for punto in puntos:
+    for stream in streams:
+        points, w, h, typ = stream[0], stream[1], stream[2], stream[3]
+        for punto in points:
             if punto[-1] == "snapped":
                 del punto[-1]
 
-    # Crear nodos arroyos y lineas arroyo
+    # Create nodes and links for the drainage network
     nodos = []
     links = OrderedDict()
     geo_hash = {}
-    for arroyo in arroyos:
-        puntos, ancho, alto, tipo = arroyo[0], arroyo[1], arroyo[2], arroyo[3]
-        tipoTramo = "arroyo" if (tipo == "Canal") else "conducto"
-        nodes = [addNode(nodos, p, tipoTramo, geo_hash) for p in puntos]
+    for stream in streams:
+        points, w, h, typ, levelIni, levelFin = stream[0], stream[1], stream[2], stream[3], stream[6], stream[7]
+        tipoTramo = "conducto" if str(typ).lower() in ["entubado", "conducto", "conduit"] else "arroyo"
+
+        nodes = [addNode(nodos, p, tipoTramo, geo_hash) for p in points]
+        length = sum(dist(nodos[n0],nodos[n1]) for n0, n1 in pairwise(nodes))
+        progFin = 0
         for n0, n1 in pairwise(nodes):
+            progIni = progFin
+            progFin = progIni + dist(nodos[n0],nodos[n1])
             if n0 == n1:
                 continue
-            # Crear un nuevo tramo
-            links[(n0, n1)] = {"type":tipoTramo, "w":ancho, "h":alto}
+            # Create a new link
+            links[(n0, n1)] = {"type":tipoTramo, "w":w, "h":h,
+                               "levelIni":levelIni + (levelFin - levelIni) * progIni / length,
+                               "levelFin":levelIni + (levelFin - levelIni) * progFin / length}
 
-    print "Número de nodos: ", len(nodos)
-    print "Número de links: ", len(links)
+    print "\tNumber of nodes for the drainage network: %i" % len(nodos)
+    print "\tNumber of links for the drainage network: %i" % len(links)
 
     # Write list files
     saveOnFile(nodos, "nodosArroyo")
     saveOnFile(links, "linksArroyo")
 
-    print "Finalizado proceso de creado de arroyos"
+    print "FINISHED: Drainage network construction"
 
 
 def mainReadStreets(shpFileCalles):
@@ -310,25 +398,20 @@ def mainGetSubcatchments(shpFileCuenca):
         subcuencas = leer_shp_poligonos(subcuencasClipShpFile, ["FID"])
 
         for i, subcuenca in enumerate(subcuencas):
-            subcuenca.append(i)
             subcuenca.append(areas[i])
 
-    subcuencas.sort(key=lambda x: float(x[1]))
+    subcuencasDict = {}
+    for subcuenca in subcuencas:
+        poligono, fid, area = subcuenca[0], subcuenca[1], subcuenca[2]
+        subcuencasDict[fid] = [poligono, area]
 
     # Completar si falta alguna y eliminar duplicadas si existieran
     centros = readFromFile('centros')
-    i = 0
-    while (i<len(centros)):
-        fid = subcuencas[i][1]
-        if (fid > i):
-            subcuencas.insert(i,[[], i, 0])
-            i += 1
-        elif (fid < i):
-            subcuencas.remove(i)
-        else:
-            i += 1
+    subcuencasCompletas = []
+    for i in range(0,len(centros)):
+        subcuencasCompletas.append(subcuencasDict.get(i, [[], 0]))
 
-    saveOnFile(subcuencas, "subcuencas")
+    saveOnFile(subcuencasCompletas, "subcuencas")
 
     print "Finalizado proceso de creado de cuencas"
 
@@ -392,10 +475,9 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
 def mainCalculateInvertOffsets():
     print "Proceso de calculo de inverts..."
 
-    coTapada = 0.3
-
     nodos = readFromFile('nodos')
     links = readFromFile('links')
+    nodosElev = readFromFile('nodosElev')
 
     nodosInvElevOffset = [0] * len(nodos)
     for n0, n1 in links:
@@ -404,15 +486,13 @@ def mainCalculateInvertOffsets():
         if link["type"] == "vertedero" or link["type"] == "sumidero":
             continue
 
-        offset = 0
-        if link["type"] == "conducto":
-            offset = - link["h"] - coTapada
-        elif link["type"] == "arroyo":
-            offset = - link["h"]
-        if (offset < nodosInvElevOffset[n0]):
-            nodosInvElevOffset[n0] = offset;
-        if (offset < nodosInvElevOffset[n1]):
-            nodosInvElevOffset[n1] = offset;
+        offset0, offset1 = 0, 0
+        if link["type"] in ["conducto", "arroyo"]:
+            offset0 = link["levelIni"] - nodosElev[n0]
+            offset1 = link["levelFin"] - nodosElev[n1]
+
+        nodosInvElevOffset[n0] = min(nodosInvElevOffset[n0], offset0)
+        nodosInvElevOffset[n1] = min(nodosInvElevOffset[n1], offset1)
     saveOnFile(nodosInvElevOffset, "nodosInvElevOffset")
 
     print "Finalizado el calculo de inverts"
@@ -549,19 +629,16 @@ def mainCreateSWMM(swmmInputFileName):
     nodosImpermeabilidad = readFromFile('nodosImpermeabilidad')
 
     nodosLongitudLineas = [0] * len(nodos)
-    for (i, nodo) in enumerate(nodos):
-        for (n0, n1) in links:
-            link = links[(n0, n1)]
-            if link["type"] != "calle" and link["type"] != "arroyo":
-                continue
-            if n0 != i and n1 != i:
-                continue
-            nodosLongitudLineas[i] = nodosLongitudLineas[i] + dist(nodos[n0], nodos[n1])
-
+    for (n0, n1) in links:
+        link = links[(n0, n1)]
+        if link["type"] not in ["calle", "arroyo"]:
+            continue
+        nodosLongitudLineas[n0] = nodosLongitudLineas[n0] + dist(nodos[n0], nodos[n1])
+        nodosLongitudLineas[n1] = nodosLongitudLineas[n1] + dist(nodos[n0], nodos[n1])
 
     areasNodo = [1.167] * len(nodos)
     for (i, centro) in enumerate(centros):
-        areasNodo[centro[2]] = juApondPer * subcuencas[i][2]
+        areasNodo[centro[2]] = juApondPer * subcuencas[i][1]
 
     tF = open(swmmInputFileName, "w")
     tF.write("[TITLE]\n")
@@ -612,7 +689,7 @@ def mainCreateSWMM(swmmInputFileName):
         numNodo = centro[2]
         coef = int(nodosCoeficiente[numNodo])
         gageName = 'GAGE' + str(coef - (coef%(100/(numGages-1))))
-        list = ['CUENCA'+str(i), gageName, 'NODO'+str(numNodo), "%.3f" % (float(subcuencas[i][2])/10000.0), "%.3f" % nodosImpermeabilidad[numNodo], "%.3f" % (nodosLongitudLineas[numNodo]/2), "%.3f" % (nodosSlope[numNodo]), "%.3f" % (subcuencas[i][2]**0.5)]
+        list = ['CUENCA'+str(i), gageName, 'NODO'+str(numNodo), "%.3f" % (float(subcuencas[i][1])/10000.0), "%.3f" % nodosImpermeabilidad[numNodo], "%.3f" % (nodosLongitudLineas[numNodo]/2), "%.3f" % (nodosSlope[numNodo]), "%.3f" % (subcuencas[i][1]**0.5)]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -641,7 +718,7 @@ def mainCreateSWMM(swmmInputFileName):
     # tF.write(";;========================================================================================\n")
     # areasNodo = [75.54] * len(nodos)
     # for (i, centro) in enumerate(centros):
-        # areasNodo[centro[2]] = juApondPer * subcuencas[i][2]
+        # areasNodo[centro[2]] = juApondPer * subcuencas[i][1]
     # for (i, nodo) in enumerate(nodos):
         # list = ['NODO'+str(i), nodosElev[i]+nodosInvElevOffset[i], juYmax-nodosInvElevOffset[i], juY0, juYsur, "%.3f" % areasNodo[i]]
         # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -685,15 +762,13 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Node1          Node2          Length         N              Z1             Z2             Q0\n")
     tF.write(";;======================================================================================================================\n")
     for i, (in0, in1) in enumerate(links):
-        link = links[(n0, n1)]
+        link = links[(in0, in1)]
         name = link["type"] + str(i)
         length = dist(nodos[in0], nodos[in1])
         if link["type"] == "calle":
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % nodosElev[in0], "%.3f" % nodosElev[in1], 0]
-        elif link["type"] == "arroyo":
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "*", "*", 0]
-        elif link["type"] == "conducto":
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "*", "*", 0]
+        elif link["type"] in ["arroyo", "conducto"]:
+            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
         else:
             continue
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -712,7 +787,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Node1          Node2          Type           Offset         Cd             Flap  (EC Cd2)          \n")
     tF.write(";;======================================================================================================================\n")
     for i, (in0, in1) in enumerate(links):
-        link = links[(n0, n1)]
+        link = links[(in0, in1)]
         if link["type"] != "vertedero":
             continue
         name = "vertedero" + str(i)
@@ -726,7 +801,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Node1          Node2          Type           Offset         Cd             Flap           Orate\n")
     tF.write(";;======================================================================================================================\n")
     for i, (in0, in1) in enumerate(links):
-        link = links[(n0, n1)]
+        link = links[(in0, in1)]
         if link["type"] != "sumidero":
             continue
         name = "sumidero" + str(i)
@@ -741,7 +816,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;========================================================================================\n")
     transectas = {}
     for i, (in0, in1) in enumerate(links):
-        link = links[(n0, n1)]
+        link = links[(in0, in1)]
         name = link["type"] + str(i)
 
         if link["type"] == "calle":
@@ -1017,7 +1092,8 @@ if __name__ == '__main__':
 
     # Opciones de corrida
     print "Que desea hacer?"
-    print " 0 - Leer arroyos"
+    print " a - Preparar red de drenaje"
+    print " 0 - Leer red de drenaje preparada"
     print " 1 - Leer las calles"
     print " 2 - Crear y leer subcuencas a partir de nodos"
     print " 3 - Leer los rasters en cada nodo"
@@ -1030,8 +1106,10 @@ if __name__ == '__main__':
     print "11 - Crear pluviometros"
     print "12 - Analisis de tirantes muertos"
     x = input("Opcion:")
+    if (x == "a"):
+        mainPrepareDrainageNetwork(defaultShpFileDrainageOriginal, defaultShpFileDrainagePrepared, defaultRasterFileDEM)
     if (x == 0):
-        mainReadRivers(defaultShpFileArroyos)
+        mainReadRivers(defaultShpFileDrainagePrepared)
     elif (x == 1):
         mainReadStreets(defaultShpFileCalles)
     elif (x == 2):

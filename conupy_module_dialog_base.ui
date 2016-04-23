@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>614</width>
-    <height>791</height>
+    <width>1231</width>
+    <height>681</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,22 +17,6 @@
    <item row="0" column="0">
     <widget class="QWidget" name="widget" native="true">
      <layout class="QGridLayout" name="gridLayout_7">
-      <item row="3" column="0">
-       <widget class="QGroupBox" name="groupBox_3">
-        <property name="title">
-         <string>Diagnóstico</string>
-        </property>
-        <layout class="QGridLayout" name="gridLayout_4">
-         <item row="0" column="0">
-          <widget class="QPushButton" name="btnActionProfMuertas">
-           <property name="text">
-            <string>Calcular profundidades muertas</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
       <item row="3" column="1">
        <widget class="QGroupBox" name="groupBox_2">
         <property name="title">
@@ -49,12 +33,35 @@
         </layout>
        </widget>
       </item>
+      <item row="3" column="0">
+       <widget class="QGroupBox" name="groupBox_3">
+        <property name="title">
+         <string>Diagnóstico</string>
+        </property>
+        <layout class="QGridLayout" name="gridLayout_4">
+         <item row="0" column="0">
+          <widget class="QPushButton" name="btnActionProfMuertas">
+           <property name="text">
+            <string>Calcular profundidades muertas</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
       <item row="2" column="0" colspan="2">
        <widget class="QGroupBox" name="groupBox_b">
         <property name="title">
          <string>Preparación del Modelo</string>
         </property>
         <layout class="QGridLayout" name="gridLayout_5">
+         <item row="2" column="2">
+          <widget class="QPushButton" name="btnActionBordes">
+           <property name="text">
+            <string>Leer nodos de borde</string>
+           </property>
+          </widget>
+         </item>
          <item row="0" column="0">
           <widget class="QPushButton" name="btnActionLimpiarWorkspace">
            <property name="text">
@@ -62,49 +69,49 @@
            </property>
           </widget>
          </item>
-         <item row="0" column="1">
+         <item row="0" column="2">
           <widget class="QPushButton" name="btnActionArroyosCalles">
            <property name="text">
-            <string>Leer arroyos y calles</string>
+            <string>Leer red de drenaje y calles</string>
            </property>
           </widget>
          </item>
-         <item row="0" column="2">
+         <item row="2" column="0">
           <widget class="QPushButton" name="btnActionSubcuencas">
            <property name="text">
             <string>Crear y leer subcuencas</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
+         <item row="2" column="1">
           <widget class="QPushButton" name="btnActionSample">
            <property name="text">
             <string>Muestrear rasters en los nodos</string>
            </property>
           </widget>
          </item>
-         <item row="1" column="1">
-          <widget class="QPushButton" name="btnActionBordes">
-           <property name="text">
-            <string>Leer nodos de borde</string>
-           </property>
-          </widget>
-         </item>
-         <item row="1" column="2">
-          <widget class="QPushButton" name="btnActionInverts">
-           <property name="text">
-            <string>Calcular inverts</string>
-           </property>
-          </widget>
-         </item>
-         <item row="3" column="0">
+         <item row="4" column="1">
           <widget class="QPushButton" name="btnActionSWMM">
            <property name="text">
             <string>Generar archivo SWMM</string>
            </property>
           </widget>
          </item>
-         <item row="3" column="1">
+         <item row="4" column="0">
+          <widget class="QPushButton" name="btnActionInverts">
+           <property name="text">
+            <string>Calcular inverts</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QPushButton" name="btnActionPrepareDrainageNetwork">
+           <property name="text">
+            <string>Preparar red de drenaje</string>
+           </property>
+          </widget>
+         </item>
+         <item row="4" column="2">
           <widget class="QPushButton" name="btnActionGenerateRain">
            <property name="text">
             <string>Generar precipitación por subcuenca</string>
@@ -154,202 +161,219 @@
             <string>Datos</string>
            </property>
            <layout class="QGridLayout" name="gridLayout_3">
-            <item row="9" column="2">
-             <widget class="QLineEdit" name="textWorkspace"/>
-            </item>
-            <item row="0" column="2">
-             <widget class="QLineEdit" name="textShpFileArroyos"/>
-            </item>
-            <item row="9" column="0">
-             <widget class="QLabel" name="label_9">
-              <property name="text">
-               <string>Directorio de Trabajo</string>
-              </property>
-             </widget>
-            </item>
-            <item row="7" column="2">
-             <widget class="QLineEdit" name="textRasterFileCoeficiente"/>
-            </item>
-            <item row="3" column="2">
-             <widget class="QLineEdit" name="textShpFileCuenca"/>
-            </item>
-            <item row="1" column="2">
-             <widget class="QLineEdit" name="textShpFileCalles"/>
-            </item>
-            <item row="3" column="3">
-             <widget class="QPushButton" name="btnCuenca">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="0">
-             <widget class="QLabel" name="label_4">
-              <property name="text">
-               <string>Raster de MDT</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="label">
-              <property name="text">
-               <string>Shape de Calles</string>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="0">
-             <widget class="QLabel" name="label_2">
-              <property name="text">
-               <string>Shape de Cuenca</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="0">
-             <widget class="QLabel" name="label_3">
-              <property name="text">
-               <string>Shape de Arroyos</string>
-              </property>
-             </widget>
-            </item>
-            <item row="8" column="2">
-             <widget class="QLineEdit" name="textRasterFileImpermeabilidad"/>
-            </item>
-            <item row="7" column="0">
-             <widget class="QLabel" name="label_6">
-              <property name="text">
-               <string>Raster de Lluvias</string>
-              </property>
-             </widget>
-            </item>
-            <item row="0" column="3">
-             <widget class="QPushButton" name="btnArroyos">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="3">
-             <widget class="QPushButton" name="btnCalles">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="2">
-             <widget class="QLineEdit" name="textRasterFileDEM"/>
-            </item>
-            <item row="6" column="2">
-             <widget class="QLineEdit" name="textRasterFileSlope"/>
-            </item>
-            <item row="4" column="0">
-             <widget class="QLabel" name="label_7">
-              <property name="text">
-               <string>Shape de Nodos Borde</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="3">
-             <widget class="QPushButton" name="btnNodosBorde">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="2">
-             <widget class="QLineEdit" name="textShpFileNodosBorde"/>
-            </item>
-            <item row="8" column="0">
-             <widget class="QLabel" name="label_8">
-              <property name="text">
-               <string>Raster de Impermeabilidad</string>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="0">
-             <widget class="QLabel" name="label_5">
-              <property name="text">
-               <string>Raster de Pendientes</string>
-              </property>
-             </widget>
-            </item>
-            <item row="10" column="2">
-             <widget class="QLineEdit" name="textModelDirectory"/>
-            </item>
-            <item row="9" column="3">
-             <widget class="QPushButton" name="btnWorkspace">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
             <item row="7" column="3">
-             <widget class="QPushButton" name="btnCoeficiente">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="10" column="3">
-             <widget class="QPushButton" name="btnModelDirectory">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="8" column="3">
-             <widget class="QPushButton" name="btnImpermeabilidad">
-              <property name="text">
-               <string>...</string>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="3">
              <widget class="QPushButton" name="btnSlope">
               <property name="text">
                <string>...</string>
               </property>
              </widget>
             </item>
-            <item row="5" column="3">
+            <item row="10" column="2">
+             <widget class="QLineEdit" name="textWorkspace"/>
+            </item>
+            <item row="8" column="2">
+             <widget class="QLineEdit" name="textRasterFileCoeficiente"/>
+            </item>
+            <item row="9" column="2">
+             <widget class="QLineEdit" name="textRasterFileImpermeabilidad"/>
+            </item>
+            <item row="7" column="2">
+             <widget class="QLineEdit" name="textRasterFileSlope"/>
+            </item>
+            <item row="6" column="3">
              <widget class="QPushButton" name="btnMDE">
               <property name="text">
                <string>...</string>
               </property>
              </widget>
             </item>
-            <item row="11" column="0">
+            <item row="6" column="2">
+             <widget class="QLineEdit" name="textRasterFileDEM"/>
+            </item>
+            <item row="5" column="2">
+             <widget class="QLineEdit" name="textShpFileNodosBorde"/>
+            </item>
+            <item row="7" column="0">
+             <widget class="QLabel" name="label_5">
+              <property name="text">
+               <string>Raster de Pendientes</string>
+              </property>
+             </widget>
+            </item>
+            <item row="11" column="2">
+             <widget class="QLineEdit" name="textModelDirectory"/>
+            </item>
+            <item row="8" column="3">
+             <widget class="QPushButton" name="btnCoeficiente">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="0">
+             <widget class="QLabel" name="label_2">
+              <property name="text">
+               <string>Shape de Cuenca</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="3">
+             <widget class="QPushButton" name="btnCuenca">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="10" column="3">
+             <widget class="QPushButton" name="btnWorkspace">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="5" column="0">
+             <widget class="QLabel" name="label_7">
+              <property name="text">
+               <string>Shape de Nodos Borde</string>
+              </property>
+             </widget>
+            </item>
+            <item row="8" column="0">
+             <widget class="QLabel" name="label_6">
+              <property name="text">
+               <string>Raster de Lluvias</string>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="3">
+             <widget class="QPushButton" name="btnImpermeabilidad">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="10" column="0">
+             <widget class="QLabel" name="label_9">
+              <property name="text">
+               <string>Directorio de Trabajo</string>
+              </property>
+             </widget>
+            </item>
+            <item row="4" column="2">
+             <widget class="QLineEdit" name="textShpFileCuenca"/>
+            </item>
+            <item row="2" column="3">
+             <widget class="QPushButton" name="btnCalles">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
+             <widget class="QLabel" name="label_3">
+              <property name="text">
+               <string>Shape de Red de Drenaje Original</string>
+              </property>
+             </widget>
+            </item>
+            <item row="6" column="0">
+             <widget class="QLabel" name="label_4">
+              <property name="text">
+               <string>Raster de MDT</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="0">
+             <widget class="QLabel" name="label">
+              <property name="text">
+               <string>Shape de Calles</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="3">
+             <widget class="QPushButton" name="btnDrainageNetworkOriginal">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="2">
+             <widget class="QLineEdit" name="textShpFileCalles"/>
+            </item>
+            <item row="5" column="3">
+             <widget class="QPushButton" name="btnNodosBorde">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="11" column="3">
+             <widget class="QPushButton" name="btnModelDirectory">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="9" column="0">
+             <widget class="QLabel" name="label_8">
+              <property name="text">
+               <string>Raster de Impermeabilidad</string>
+              </property>
+             </widget>
+            </item>
+            <item row="12" column="0">
              <widget class="QLabel" name="label_11">
               <property name="text">
                <string>Nombre de la corrida</string>
               </property>
              </widget>
             </item>
-            <item row="10" column="0">
+            <item row="11" column="0">
              <widget class="QLabel" name="label_10">
               <property name="text">
                <string>Directorio del Modelo</string>
               </property>
              </widget>
             </item>
-            <item row="12" column="0">
+            <item row="13" column="2">
+             <widget class="QLineEdit" name="textRainFileName"/>
+            </item>
+            <item row="12" column="2">
+             <widget class="QLineEdit" name="textModelFileName"/>
+            </item>
+            <item row="13" column="0">
              <widget class="QLabel" name="label_12">
               <property name="text">
                <string>Serie de Precipitación</string>
               </property>
              </widget>
             </item>
-            <item row="12" column="2">
-             <widget class="QLineEdit" name="textRainFileName"/>
-            </item>
-            <item row="12" column="3">
+            <item row="13" column="3">
              <widget class="QPushButton" name="btnRain">
               <property name="text">
                <string>...</string>
               </property>
              </widget>
             </item>
-            <item row="11" column="2">
-             <widget class="QLineEdit" name="textModelFileName"/>
+            <item row="0" column="2">
+             <widget class="QLineEdit" name="textShpFileDrainageNetworkOriginal"/>
+            </item>
+            <item row="1" column="0">
+             <widget class="QLabel" name="label_13">
+              <property name="text">
+               <string>Shape de Red de Drenaje Preparada</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="3">
+             <widget class="QPushButton" name="btnDrainageNetworkPrepared">
+              <property name="text">
+               <string>...</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="2">
+             <widget class="QLineEdit" name="textShpFileDrainageNetworkPrepared"/>
             </item>
            </layout>
           </widget>
@@ -357,20 +381,20 @@
         </layout>
        </widget>
       </item>
-      <item row="5" column="0" colspan="2">
-       <widget class="QGroupBox" name="groupBox_c">
-        <property name="title">
-         <string>Información de estado</string>
+     </layout>
+    </widget>
+   </item>
+   <item row="0" column="1">
+    <widget class="QGroupBox" name="groupBox_c">
+     <property name="title">
+      <string>Información de estado</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_6">
+      <item row="2" column="0">
+       <widget class="QTextEdit" name="textInfo">
+        <property name="verticalScrollBarPolicy">
+         <enum>Qt::ScrollBarAlwaysOn</enum>
         </property>
-        <layout class="QGridLayout" name="gridLayout_6">
-         <item row="2" column="0">
-          <widget class="QTextEdit" name="textInfo">
-           <property name="verticalScrollBarPolicy">
-            <enum>Qt::ScrollBarAlwaysOn</enum>
-           </property>
-          </widget>
-         </item>
-        </layout>
        </widget>
       </item>
      </layout>

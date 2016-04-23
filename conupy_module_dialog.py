@@ -61,7 +61,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.actionGuardar.clicked.connect(self.guardar)
         self.actionGuardarComo.clicked.connect(self.guardar_como)
 
-        self.btnArroyos.clicked.connect(self.btnArroyos_click)
+        self.btnDrainageNetworkOriginal.clicked.connect(self.btnDrainageNetworkOriginal_click)
+        self.btnDrainageNetworkPrepared.clicked.connect(self.btnDrainageNetworkPrepared_click)
         self.btnCalles.clicked.connect(self.btnCalles_click)
         self.btnCuenca.clicked.connect(self.btnCuenca_click)
         self.btnNodosBorde.clicked.connect(self.btnNodosBorde_click)
@@ -74,6 +75,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.btnRain.clicked.connect(self.btnRain_click)
 
         self.btnActionLimpiarWorkspace.clicked.connect(self.btnActionLimpiarWorkspace_click)
+        self.btnActionPrepareDrainageNetwork.clicked.connect(self.btnActionPrepareDrainageNetwork_click)
         self.btnActionArroyosCalles.clicked.connect(self.btnActionArroyosCalles_click)
         self.btnActionSubcuencas.clicked.connect(self.btnActionSubcuencas_click)
         self.btnActionSample.clicked.connect(self.btnActionSample_click)
@@ -85,7 +87,10 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.btnActionExtraerProf.clicked.connect(self.btnActionExtraerProf_click)
 
         # Enlazar los Event Handlers de las cajas de texto
-        self.connect(self.textShpFileArroyos,
+        self.connect(self.textShpFileDrainageNetworkOriginal,
+                        QtCore.SIGNAL("textEdited(QString)"),
+                        self.leer_datos_generales)
+        self.connect(self.textShpFileDrainageNetworkPrepared,
                         QtCore.SIGNAL("textEdited(QString)"),
                         self.leer_datos_generales)
         self.connect(self.textShpFileCalles,
@@ -126,7 +131,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
     def nuevo(self):
         self.nombreArchivo = None
 
-        self.shpFileArroyos = ""
+        self.shpFileDrainageNetworkOriginal = ""
+        self.shpFileDrainageNetworkPrepared = ""
         self.shpFileCalles = ""
         self.shpFileCuenca = ""
         self.shpFileNodosBorde = ""
@@ -143,7 +149,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
 
     def devolver_diccionario(self):
         variables = [ \
-            "shpFileArroyos", \
+            "shpFileDrainageNetworkOriginal", \
+            "shpFileDrainageNetworkPrepared", \
             "shpFileCalles", \
             "shpFileCuenca", \
             "shpFileNodosBorde", \
@@ -206,7 +213,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
 
     def actualizar_datos_generales(self):
         try:
-            self.textShpFileArroyos.setText(str(self.shpFileArroyos))
+            self.textShpFileDrainageNetworkOriginal.setText(str(self.shpFileDrainageNetworkOriginal))
+            self.textShpFileDrainageNetworkPrepared.setText(str(self.shpFileDrainageNetworkPrepared))
             self.textShpFileCalles.setText(str(self.shpFileCalles))
             self.textShpFileCuenca.setText(str(self.shpFileCuenca))
             self.textShpFileNodosBorde.setText(str(self.shpFileNodosBorde))
@@ -223,7 +231,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
     def leer_datos_generales(self):
         try:
             pass
-            self.shpFileArroyos = self.textShpFileArroyos.text()
+            self.shpFileDrainageNetworkOriginal = self.textShpFileDrainageNetworkOriginal.text()
+            self.shpFileDrainageNetworkPrepared = self.textShpFileDrainageNetworkPrepared.text()
             self.shpFileCalles = self.textShpFileCalles.text()
             self.shpFileCuenca = self.textShpFileCuenca.text()
             self.shpFileNodosBorde = self.textShpFileNodosBorde.text()
@@ -237,13 +246,22 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             self.rainFileName = self.textRainFileName.text()
         except: pass
 
-    # Event handlers de btnArroyos
-    def btnArroyos_click(self):
+    # Event handlers de btnDrainageNetworkOriginal
+    def btnDrainageNetworkOriginal_click(self):
         text = QtGui.QFileDialog.getOpenFileName(self, u'Seleccionar shape de arroyos',
             self.last_path, u"Shape (*.shp)")
         if text is not None and not str(text) == "":
             self.last_path = os.path.dirname(text)
-            self.textShpFileArroyos.setText(text)
+            self.textShpFileDrainageNetworkOriginal.setText(text)
+            self.leer_datos_generales()
+
+    # Event handlers de btnDrainageNetworkPrepared
+    def btnDrainageNetworkPrepared_click(self):
+        text = QtGui.QFileDialog.getOpenFileName(self, u'Seleccionar shape de arroyos',
+            self.last_path, u"Shape (*.shp)")
+        if text is not None and not str(text) == "":
+            self.last_path = os.path.dirname(text)
+            self.textShpFileDrainageNetworkPrepared.setText(text)
             self.leer_datos_generales()
 
     # Event handlers de btnCalles
@@ -352,13 +370,21 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         os.chdir(self.workspace)
         conuPy.mainCleanWorkspace(self.workspace)
 
+    # Event handlers de btnActionPrepareDrainageNetwork
+    def btnActionPrepareDrainageNetwork_click(self):
+        # Redireccionar stdout a la caja de texto
+        sys.stdout = WriteStreamInmediate(self.textInfo)
+
+        os.chdir(self.workspace)
+        conuPy.mainPrepareDrainageNetwork(self.shpFileDrainageNetworkOriginal, self.shpFileDrainageNetworkPrepared, self.rasterFileDEM)
+
     # Event handlers de btnActionArroyosCalles
     def btnActionArroyosCalles_click(self):
         # Redireccionar stdout a la caja de texto
         sys.stdout = WriteStreamInmediate(self.textInfo)
 
         os.chdir(self.workspace)
-        conuPy.mainReadRivers(self.shpFileArroyos)
+        conuPy.mainReadDrainageNetwork(self.shpFileDrainageNetworkPrepared)
         conuPy.mainReadStreets(self.shpFileCalles)
 
     # Event handlers de btnActionSubcuencas
