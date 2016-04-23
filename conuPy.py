@@ -1,5 +1,6 @@
-#engine = "arcgis10"
-engine = "qgis"
+# conuPy.py encoding: utf-8
+
+engine = "qgis" #"arcgis10" | "qgis_standalone"
 
 import sys, os
 from collections import OrderedDict
