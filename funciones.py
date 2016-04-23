@@ -1,6 +1,7 @@
 ﻿# GIS functions for ArcGis 10.1
 import math
 import pickle
+from itertools import tee, izip
 
 def saveOnFile( data, name ):
     oF = open(name + ".pkl", 'wb')
@@ -57,12 +58,13 @@ def removePoints(puntos, distMax = 25):
             i += 1
 
 
-def atraviesaArroyo(p0, p1, nodos, lineas):
-    for linea in lineas:
-        if (linea[2] == "arroyo"):
-            if (intersect(p0, p1, nodos[linea[0]], nodos[linea[1]])):
-                return linea[0]
-        if (linea[2] == "calle"):
+def atraviesaArroyo(p0, p1, nodos, links):
+    for n0, n1 in links:
+        link = links[(n0, n1)]
+        if link["type"] == "arroyo":
+            if (intersect(p0, p1, nodos[n0], nodos[n1])):
+                return n0
+        if link["type"] == "calle":
             break
 
     return -1
@@ -76,8 +78,18 @@ def intersect(A,B,C,D):
     return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
 
 
-def addNode(nodos, punto, tipo = "esquina", tolSq = 30):
-    for (i, nodo) in enumerate(nodos):
+def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
+
+    ix, iy = int(punto[0]/1000.0), int(punto[1]/1000.0)
+    nodosCercanos = []
+    for i in [-1, 0, 1]:
+        for j in [-1, 0, 1]:
+            a = geo_hash.get((ix+i, iy+j), [])
+            nodosCercanos.extend(a)
+
+
+    for i in nodosCercanos:
+        nodo = nodos[i]
         if distSq(nodo, punto) < tolSq:
             if nodo[2] == "conducto":
                 # Si llega al menos un arroyo a un nodo conducto, pasa a ser nodo arroyo
@@ -111,4 +123,13 @@ def addNode(nodos, punto, tipo = "esquina", tolSq = 30):
     # Si no hay nodos cercanos, agregar uno
     punto.append(tipo)
     nodos.append(punto)
+    geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
+    geo_hash[(ix,iy)].append(len(nodos)-1)
     return len(nodos)-1;
+
+
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = tee(iterable)
+    next(b, None)
+    return izip(a, b)
