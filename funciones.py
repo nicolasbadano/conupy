@@ -28,32 +28,32 @@ def interpolate(p0, p1, alpha):
     return [p0[0] + (p1[0]-p0[0])*alpha, p0[1] + (p1[1]-p0[1])*alpha]
 
 
-def insertPoints(puntos, distMax = 50):
+def insertPoints(points, maxLength = 50):
     i = 0
-    while (i<len(puntos)-1):
-        p0 = puntos[i]
-        p1 = puntos[i+1]
-        largo = dist(p0, p1)
-        if (largo > distMax):
-            numTramos = int(math.floor(largo / distMax + 1))
-            largoNuevo = largo / numTramos
-            for j in xrange(1,numTramos):
-                puntos.insert(i+j, interpolate(p0, p1, float(j)/float(numTramos)))
-            i += numTramos
+    while (i<len(points)-1):
+        p0 = points[i]
+        p1 = points[i+1]
+        length = dist(p0, p1)
+        if (length > maxLength):
+            numSpans = int(math.floor(length / maxLength + 1))
+            newLength = length / numSpans
+            for j in xrange(1,numSpans):
+                points.insert(i+j, interpolate(p0, p1, float(j)/float(numSpans)))
+            i += numSpans
         else:
             i += 1
 
 
-def removePoints(puntos, distMax = 25):
+def removePoints(points, maxLength = 25):
     i = 1
-    while (i<len(puntos)-1):
-        p2 = puntos[i-1]
-        p0 = puntos[i]
-        p1 = puntos[i+1]
-        largoAnterior = dist(p2, p0)
-        largoSiguiente = dist(p0, p1)
-        if largoAnterior < distMax and largoSiguiente < distMax and p0[-1] != "snapped":
-            puntos.pop(i)
+    while (i<len(points)-1):
+        p2 = points[i-1]
+        p0 = points[i]
+        p1 = points[i+1]
+        lengthAnterior = dist(p2, p0)
+        lengthSiguiente = dist(p0, p1)
+        if lengthAnterior < maxLength and lengthSiguiente < maxLength and p0[-1] != "snapped":
+            points.pop(i)
         else:
             i += 1
 
