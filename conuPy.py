@@ -108,9 +108,13 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
         if typ is None:
             print "ERROR: Missing type value on stream"
             return
+        if str(typ).lower() in ["entubado", "conducto", "conduit"]:
+            typ = "conduit"
+        else:
+            typ = "channel"
         if levelIni is None:
             if depthIni is None:
-                if str(typ).lower() in ["entubado", "conducto", "conduit"]:
+                if typ == "conduit"
                     depthIni = h + minCoverage
                 else:
                     depthIni = h
@@ -120,7 +124,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
 
         if levelFin is None:
             if depthFin is None:
-                if str(typ).lower() in ["entubado", "conducto", "conduit"]:
+                if typ == "conduit"
                     depthFin = h + minCoverage
                 else:
                     depthFin = h
@@ -128,7 +132,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
         else:
             depthFin = nodesTerrainLevels[inode+1] - levelFin
 
-        stream[4], stream[5], stream[6], stream[7] = depthIni, depthFin, levelIni, levelFin
+        stream[3], stream[4], stream[5], stream[6], stream[7] = typ, depthIni, depthFin, levelIni, levelFin
         inode += 2
 
     # Calculate length of each stream
@@ -200,7 +204,7 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
     geo_hash = {}
     for stream in streams:
         points, w, h, typ, levelIni, levelFin = stream[0], stream[1], stream[2], stream[3], stream[6], stream[7]
-        tipoTramo = "conducto" if str(typ).lower() in ["entubado", "conducto", "conduit"] else "arroyo"
+        tipoTramo = "conduit" if str(typ).lower() in ["entubado", "conducto", "conduit"] else "channel"
 
         nodes = [addNode(nodos, p, tipoTramo, geo_hash) for p in points]
         length = sum(dist(nodos[n0],nodos[n1]) for n0, n1 in pairwise(nodes))
@@ -487,7 +491,7 @@ def mainCalculateInvertOffsets():
             continue
 
         offset0, offset1 = 0, 0
-        if link["type"] in ["conducto", "arroyo"]:
+        if link["type"] in ["conduit", "channel"]:
             offset0 = link["levelIni"] - nodosElev[n0]
             offset1 = link["levelFin"] - nodosElev[n1]
 
@@ -767,7 +771,7 @@ def mainCreateSWMM(swmmInputFileName):
         length = dist(nodos[in0], nodos[in1])
         if link["type"] == "calle":
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % nodosElev[in0], "%.3f" % nodosElev[in1], 0]
-        elif link["type"] in ["arroyo", "conducto"]:
+        elif link["type"] in ["channel", "conduit"]:
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
         else:
             continue
@@ -823,11 +827,11 @@ def mainCreateSWMM(swmmInputFileName):
             tname = link["type"] + str(int(link["w"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
-        elif link["type"] == "arroyo":
+        elif link["type"] == "channel":
             tname = link["type"] + str(int(link["w"]))  + "x" + str(int(link["h"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
-        elif link["type"] == "conducto":
+        elif link["type"] == "conduit":
             list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0]
         elif link["type"] == "vertedero":
             list = ['vertedero'+str(i), 'RECT_OPEN', xsVertederoH, xsVertederoW, 0, 0]
@@ -856,7 +860,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;========================================================================================\n")
     for key, value in transectas.items():
         tipo, tname, ancho, alto = value
-        if (tipo == "arroyo"):
+        if (tipo == "channel"):
             traTiranteArroyo = alto + coTapada
             list = ['NC', traNArroyoPlanicie, traNArroyoPlanicie, traNArroyoCauce]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -869,7 +873,7 @@ def mainCreateSWMM(swmmInputFileName):
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
             tF.write(";;-------------------------------------------\n")
-        # elif (tipo == "conducto"):
+        # elif (tipo == "conduit"):
             # list = ['NC', traNConducto, traNConducto, traNConducto]
             # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             # tF.write("\n")
