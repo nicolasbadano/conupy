@@ -553,58 +553,6 @@ def mainCalculateInvertOffsets():
     print "Finalizado el calculo de inverts"
 
 
-def mainCorregirArroyos():
-    nodos = readFromFile('nodos')
-    nodosElev = readFromFile('nodosElev')
-    nodosInvElevOffset = readFromFile('nodosInvElevOffset')
-
-    # Leer archivo imp anterior
-    tF = open(swmmCorregirArroyosFileName, "r")
-    lineas = tF.readlines()
-    tF.close()
-    # Leer nodos e invElevsAnteriores
-    invElevsAnteriores = dict()
-    for i in xrange(0,len(lineas)):
-        if lineas[i].startswith("[STORAGE]") :
-            i = i + 1
-            while (lineas[i].startswith("[") == False):
-                if (lineas[i].startswith(";") == False):
-                    partes = lineas[i].split()
-                    if len(partes) >= 2:
-                        invElevsAnteriores[partes[0]] = float(partes[1])
-                i += 1
-            break
-    # Leer coordenadas anteriores
-    coordenadasAnteriores = []
-    for i in xrange(0,len(lineas)):
-        if lineas[i].startswith("[COORDINATES]") :
-            i = i + 1
-            while (lineas[i].startswith("[") == False):
-                if (lineas[i].startswith(";") == False):
-                    partes = lineas[i].split()
-                    if len(partes) == 3:
-                        coordenadasAnteriores.append( [float(partes[1]), float(partes[2]), partes[0]] )
-                i += 1
-            break
-
-    # Bajar los inverts actuales de los nodos arroyo y conducto si hace falta
-    for i, nodo in enumerate(nodos):
-        if nodo[2] != "esquina":
-            # Buscar nodo cercano
-            for coordenada in coordenadasAnteriores:
-                #Buscar el mismo nodo en el archivo anterior
-                if (distSq(nodo, coordenada) < 1.0):
-                    invElevAnterior = invElevsAnteriores[coordenada[2]]
-                    #Bajar el terreno si es necesario
-                    if (invElevAnterior < nodosElev[i] + nodosInvElevOffset[i] - 0.02 ) :
-                        print "Nodo ", i, " bajado", nodosElev[i] + nodosInvElevOffset[i] - invElevAnterior
-                        nodosInvElevOffset[i] = invElevAnterior - nodosElev[i]
-                    break
-
-    # Grabar invertOffsets modificados
-    saveOnFile(nodosInvElevOffset, "nodosInvElevOffset")
-
-
 def mainCreateSWMM(swmmInputFileName):
     print "Proceso de escritura de archivo SWMM..."
 
@@ -1110,36 +1058,33 @@ if __name__ == '__main__':
 
     # Opciones de corrida
     print "Que desea hacer?"
-    print " a - Preparar red de drenaje"
-    print " 0 - Leer red de drenaje preparada"
-    print " 1 - Leer las calles"
-    print " 2 - Crear y leer subcuencas a partir de nodos"
-    print " 3 - Leer los rasters en cada nodo"
-    print " 4 - Leer Nodos de borde y generar outfalls"
-    print " 5 - Calcular los inverts"
-    print " 6 - (Opcional)Corregir los perfiles de arroyos y conductos usando otro archivo .inp"
+    print " 0 - Preparar red de drenaje"
+    print " 1 - Leer red de drenaje preparada"
+    print " 2 - Leer las calles"
+    print " 3 - Crear y leer subcuencas a partir de nodos"
+    print " 4 - Leer los rasters en cada nodo"
+    print " 5 - Leer Nodos de borde y generar outfalls"
+    print " 6 - Calcular los inverts"
     print " 7 - Generar archivos de SWMM"
     print " 8 - Todo"
     print " 9 - Leer resultados y escribir shp con profundidad y elevacion en nodos"
     print "11 - Crear pluviometros"
     print "12 - Analisis de tirantes muertos"
     x = input("Opcion:")
-    if (x == "a"):
-        mainPrepareDrainageNetwork(defaultShpFileDrainageOriginal, defaultShpFileDrainagePrepared, defaultRasterFileDEM)
     if (x == 0):
-        mainReadRivers(defaultShpFileDrainagePrepared)
+        mainPrepareDrainageNetwork(defaultShpFileDrainageOriginal, defaultShpFileDrainagePrepared, defaultRasterFileDEM)
     elif (x == 1):
-        mainReadStreets(defaultShpFileCalles)
+        mainReadRivers(defaultShpFileDrainagePrepared)
     elif (x == 2):
-        mainGetSubcatchments(defaultShpFileCuenca)
+        mainReadStreets(defaultShpFileCalles)
     elif (x == 3):
-        mainSampleNodeData(defaultRasterFileDEM, defaultRasterFileSlope, defaultRasterFileCoeficiente, defaultRasterFileImpermeabilidad)
+        mainGetSubcatchments(defaultShpFileCuenca)
     elif (x == 4):
-        mainCreateOutfallNodes(defaultShpFileNodosBorde)
+        mainSampleNodeData(defaultRasterFileDEM, defaultRasterFileSlope, defaultRasterFileCoeficiente, defaultRasterFileImpermeabilidad)
     elif (x == 5):
-        mainCalculateInvertOffsets()
+        mainCreateOutfallNodes(defaultShpFileNodosBorde)
     elif (x == 6):
-        mainCorregirArroyos()
+        mainCalculateInvertOffsets()
     elif (x == 7):
         mainCreateSWMM(defaultSwmmInputFileName)
     elif (x == 8):
