@@ -114,7 +114,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
             typ = "channel"
         if levelIni is None:
             if depthIni is None:
-                if typ == "conduit"
+                if typ == "conduit":
                     depthIni = h + minCoverage
                 else:
                     depthIni = h
@@ -124,7 +124,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
 
         if levelFin is None:
             if depthFin is None:
-                if typ == "conduit"
+                if typ == "conduit":
                     depthFin = h + minCoverage
                 else:
                     depthFin = h
