@@ -58,6 +58,60 @@ defaultGageFileName         = modelFolder + "lluvia.in"
 defaultGagesFileName        = modelFolder + "pluviom.dat"
 defaultSwmmOuputFileName    = modelFolder + "conurbano.out"
 
+# Parameters
+params = {}
+# Max dist for which channel and stream nodes are snapped together
+params["maxDistSnapStreamNodes"] = 50.0
+# Max length stream spans can have without been subdivided
+params["maxLengthForStreamSpanDivide"] = 100.0
+# Min length stream spans can have without been joined
+params["minLengthForStreamSpanJoin"] = 75.0
+# Default coverage for conduits when no depths or levels were defined
+params["minCoverage"] = 0.3
+# Max distance required for gutters to be created from a corner to a conduit node
+params["maxDistGutter"] = 80.0
+# Max distance required for weirs to be created from a corner to a channel node
+params["maxDistWeir"] = 50.0
+# Max dist for which outfall nodes are connected to regular nodes
+params["maxDistConnectOutfallNodes"] = 50.0
+
+params["evap"] = 4.0 # mm/dia
+# Manning's n for overland flow over the impervious sub-area.
+params["saNImp"] = 0.025
+# Manning's n for overland flow over the pervious sub-area.
+params["saNPerv"] = 0.05
+# depression storage for impervious sub-area (inches or mm).
+params["saSImp"] = 0 #mm
+# depression storage for pervious sub-area (inches or mm).
+params["saSPerv"] = 0 #mm
+# percent of impervious area with no depression storage.
+params["saZero"] = 100 #%
+# Infiltration Horton
+params["inF0"] = 50.0 #mm/hr
+params["inFf"] = 5.0 #mm/hr
+params["inCoefDecaim"] = 2.0
+# Time it takes for fully saturated soil to dry  (days).
+params["inDryTime"] = 5.0
+# Maximum infiltration volume possible (0 if not applicable) (in or mm)
+params["inMaxInf"] = 0
+# Value of n (i.e., roughness parameter) in Manning's equation.
+params["coN"] = 0.04
+# Weirs parameters
+params["weAlturaCordon"] = 0.05
+params["weCd"] = 3.0
+# XSection parameters
+params["xsG1"], params["xsG3"], params["xsG4"] = 10, 0, 0
+params["xsSumideroH"], params["xsSumideroW"] = 0.15, 2.0
+params["xsVertederoH"], params["xsVertederoW"] = 10.0, 20.0
+# Transect parameters
+params["traNConducto"] = 0.03
+params["traNArroyoPlanicie"] = 0.05
+params["traNArroyoCauce"] = 0.03
+params["traNCalle"] = 0.04
+params["traAnchoMargenArroyo"] = 20
+params["traAnchoVereda"] = 2
+params["traAltoCordon"] = 0.2
+
 # Numero de Gages
 numGages = 21
 
@@ -92,9 +146,6 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
     # Sample the terrain on the nodes
     nodesTerrainLevels = sample_raster_on_nodes(shpFileNodesDrainageNetwork, rasterFileDEM)
 
-    # Min Coverage
-    minCoverage = 0.3
-
     # Prepare the drainage network elevations base on available data for each node
     inode = 0
     for stream in streams:
@@ -115,7 +166,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
         if levelIni is None:
             if depthIni is None:
                 if typ == "conduit":
-                    depthIni = h + minCoverage
+                    depthIni = h + params["minCoverage"]
                 else:
                     depthIni = h
             levelIni = nodesTerrainLevels[inode] - depthIni
@@ -125,7 +176,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
         if levelFin is None:
             if depthFin is None:
                 if typ == "conduit":
-                    depthFin = h + minCoverage
+                    depthFin = h + params["minCoverage"]
                 else:
                     depthFin = h
             levelFin = nodesTerrainLevels[inode+1] - depthFin
@@ -162,9 +213,9 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
     # Read the prepared drainage network
     streams = leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
 
-    # Subdivide the streams in spans shorter than 100m
+    # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide (100m)
     for stream in streams:
-        insertPoints(stream[0], 100)
+        insertPoints(stream[0], params["maxLengthForStreamSpanDivide"])
 
     # Snap the end nodes of each stream to nearby nodes of other streams
     for stream in streams:
@@ -172,7 +223,7 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
             for streamo in streams:
                 if (stream == streamo):
                     continue
-                mindistSq, minj = 50*50, -1
+                mindistSq, minj = pow(params["maxDistSnapStreamNodes"], 2), -1
                 for (j, p2) in enumerate(streamo[0]):
                     dSq = distSq(p, p2)
                     if dSq < mindistSq:
@@ -188,9 +239,9 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
         stream[0][-1] = snap(stream[0][-1], stream, streams)
 
 
-    # Join streams spans shorter than 75m unless they've been "snapped"
+    # Join streams spans shorter than minLengthForStreamSpanJoin (75m) unless they've been "snapped"
     for stream in streams:
-        removePoints(stream[0], 75)
+        removePoints(stream[0], params["minLengthForStreamSpanJoin"])
 
     for stream in streams:
         points, w, h, typ = stream[0], stream[1], stream[2], stream[3]
@@ -294,7 +345,7 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Buscar el nodo conducto mas cercano
-        mindist, minj = 80, -1
+        mindist, minj = params["maxDistGutter"], -1
         for (j, nodo2) in enumerate(nodos):
             if nodo2[2] == "conducto":
                 d = dist(nodo, nodo2)
@@ -322,7 +373,7 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Buscar el nodo arroyo mas cercano
-        mindist, minj = 50, -1
+        mindist, minj = params["maxDistWeir"], -1
         for (j, nodo2) in enumerate(nodos):
             if nodo2[2] == "arroyo":
                 d = dist(nodo, nodo2)
@@ -334,7 +385,7 @@ def mainReadStreets(shpFileCalles):
                 break
         if minj == -1:
             continue
-        # Existe un nodo arroyo cerca (< 50m)
+        # Existe un nodo arroyo cerca
         n0, n1 = i, minj
         # Si ya existe una conexión entre los nodos
         if (n0, n1) in links or (n1, n0) in links:
@@ -456,7 +507,7 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
 
     for (i, nodo) in enumerate(nodos):
         # Buscar la posicion outfall mas cercana
-        mindist, minj = 50, -1
+        mindist, minj = params["maxDistConnectOutfallNodes"], -1
         for (j, posNO) in enumerate(posicionesNodosOutfall):
             if dist(nodo, posNO) < mindist:
                 mindisdt = dist(nodo, posNO)
@@ -466,7 +517,7 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
 
         nodosOutfall.append(list(posicionesNodosOutfall[minj]))
         nodosOutfallElev.append(nodosElev[i])
-        lineasOutfall.append( [i, len(nodosOutfall)-1, 50] )
+        lineasOutfall.append( [i, len(nodosOutfall)-1, params["maxDistConnectOutfallNodes"]] )
 
     print nodosOutfall, nodosOutfallElev, lineasOutfall
 
@@ -557,66 +608,6 @@ def mainCorregirArroyos():
 def mainCreateSWMM(swmmInputFileName):
     print "Proceso de escritura de archivo SWMM..."
 
-    evap = 4 # mm/dia
-    # percent imperviousness of subcatchment.
-    #scImperv = 25 #%
-    # subcatchment slope (percent).
-    #scSlope = 0.2 #%
-
-    # Manning's n for overland flow over the impervious sub-area.
-    saNImp = 0.025
-    # Manning's n for overland flow over the pervious sub-area.
-    saNPerv = 0.05
-    # depression storage for impervious sub-area (inches or mm).
-    saSImp = 0 #mm
-    # depression storage for pervious sub-area (inches or mm).
-    saSPerv = 0 #mm
-    # percent of impervious area with no depression storage.
-    saZero = 100 #%
-
-    # Infiltration Horton
-    inF0 = 50 #mm/hr
-    inFf = 5 #mm/hr
-    inCoefDecaim = 2
-    # Time it takes for fully saturated soil to dry  (days).
-    inDryTime = 5
-    # Maximum infiltration volume possible (0 if not applicable) (in or mm)
-    inMaxInf = 0
-
-    # Depth from ground to invert elevation (ft or m) (default is 0).
-    juYmax = 1.0
-    # Water depth at start of simulation (ft or m) (default is 0).
-    juY0 = 0
-    # maximum additional head above ground elevation that manhole junction can sustain under surcharge conditions (ft or m) (default is 0).
-    juYsur = 0
-    # % del area de la subcuenca en que se almacena el agua en el nodo
-    juApondPer = 0.75
-
-    # value of n (i.e., roughness parameter) in Manning's equation.
-    coN = 0.04
-    coTapada = 0.3
-
-    # Weirs parameters
-    weAlturaCordon = 0.05
-    weCd = 3.0
-    # Orifices parameters
-    orCd = 0.6
-
-    # XSection parameters
-    xsG1, xsG3, xsG4 = 10, 0, 0
-    xsSumideroH, xsSumideroW = 0.15, 2.0
-    xsVertederoH, xsVertederoW = 10.0, 20.0
-
-    # Transect parameters
-    traNConducto = 0.03
-    traNArroyoPlanicie = 0.05
-    traNArroyoCauce = 0.03
-    traNCalle = 0.04
-    traAnchoMargenArroyo = 20
-    #traTiranteArroyo = 1.5
-    traAnchoVereda = 2
-    traAltoCordon = 0.2
-
     nodos = readFromFile('nodos')
     centros = readFromFile('centros')
     links = readFromFile('links')
@@ -683,7 +674,7 @@ def mainCreateSWMM(swmmInputFileName):
 
     tF.write("\n")
     tF.write("[EVAPORATION]\n")
-    tF.write("CONSTANT  "+str(evap)+"\n")
+    tF.write("CONSTANT  %.3f\n" % params["evap"])
 
     tF.write("\n")
     tF.write("[SUBCATCHMENTS]\n")
@@ -702,7 +693,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         N_Imp          N_Perv         S_Imp          S_Perv         %ZER           RouteTo\n")
     tF.write(";;=======================================================================================================\n")
     for (i, centro) in enumerate(centros):
-        list = ['CUENCA'+str(i), saNImp, saNPerv, saSImp, saSPerv, saZero, 'OUTLET']
+        list = ['CUENCA'+str(i), params["saNImp"], params["saNPerv"], params["saSImp"], params["saSPerv"], params["saZero"], 'OUTLET']
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -711,11 +702,19 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Subcat       MaxRate        MinRate        Decay          DryTime        Max Inf\n")
     tF.write(";;========================================================================================\n")
     for (i, centro) in enumerate(centros):
-        list = ['CUENCA'+str(i), inF0, inFf, inCoefDecaim, inDryTime, inMaxInf]
+        list = ['CUENCA'+str(i), params["inF0"], params["inFf"], params["inCoefDecaim"], params["inDryTime"], params["inMaxInf"]]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
 
+    # Depth from ground to invert elevation (ft or m) (default is 0).
+    # juYmax = 1.0
+    # Water depth at start of simulation (ft or m) (default is 0).
+    # juY0 = 0
+    # maximum additional head above ground elevation that manhole junction can sustain under surcharge conditions (ft or m) (default is 0).
+    # juYsur = 0
+    # % del area de la subcuenca en que se almacena el agua en el nodo
+    # juApondPer = 0.75
     # tF.write("\n")
     # tF.write("[JUNCTIONS]\n")
     # tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
@@ -770,9 +769,9 @@ def mainCreateSWMM(swmmInputFileName):
         name = link["type"] + str(i)
         length = dist(nodos[in0], nodos[in1])
         if link["type"] == "calle":
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % nodosElev[in0], "%.3f" % nodosElev[in1], 0]
+            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodosElev[in0], "%.3f" % nodosElev[in1], 0]
         elif link["type"] in ["channel", "conduit"]:
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
+            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
         else:
             continue
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -781,7 +780,7 @@ def mainCreateSWMM(swmmInputFileName):
         in0, in1, ancho = linea
         name = 'SALIDA' + str(i)
         length = dist(nodos[in0], nodosOutfall[in1])
-        list = [name, 'NODO'+str(in0), 'NODOOUT'+str(in1), "%.3f" % length, "%.3f" % coN, "%.3f" % (nodosElev[in0]+nodosInvElevOffset[in0]), "%.3f" % (nodosElev[in0]+nodosInvElevOffset[in0]), 0]
+        list = [name, 'NODO'+str(in0), 'NODOOUT'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % (nodosElev[in0]+nodosInvElevOffset[in0]), "%.3f" % (nodosElev[in0]+nodosInvElevOffset[in0]), 0]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -795,7 +794,7 @@ def mainCreateSWMM(swmmInputFileName):
         if link["type"] != "vertedero":
             continue
         name = "vertedero" + str(i)
-        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDEFLOW", "%.3f" % (nodosElev[in0]+weAlturaCordon), weCd, "NO"]
+        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDEFLOW", "%.3f" % (nodosElev[in0]+params["weAlturaCordon"]), params["weCd"], "NO"]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -809,7 +808,7 @@ def mainCreateSWMM(swmmInputFileName):
         if link["type"] != "sumidero":
             continue
         name = "sumidero" + str(i)
-        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDE", 0, "%.3f" % (nodosElev[in0]-traAltoCordon), "NO", 0]
+        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDE", 0, "%.3f" % (nodosElev[in0]-params["traAltoCordon"]), "NO", 0]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -834,9 +833,9 @@ def mainCreateSWMM(swmmInputFileName):
         elif link["type"] == "conduit":
             list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0]
         elif link["type"] == "vertedero":
-            list = ['vertedero'+str(i), 'RECT_OPEN', xsVertederoH, xsVertederoW, 0, 0]
+            list = ['vertedero'+str(i), 'RECT_OPEN', params["xsVertederoH"], params["xsVertederoW"], 0, 0]
         elif link["type"] == "sumidero":
-            list = ['sumidero'+str(i), 'RECT_CLOSED', xsSumideroH, xsSumideroW, 0, 0]
+            list = ['sumidero'+str(i), 'RECT_CLOSED', params["xsSumideroH"], params["xsSumideroW"], 0, 0]
         elif link["type"] == "calle":
             tname = link["type"] + str(int(link["w"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
@@ -847,7 +846,7 @@ def mainCreateSWMM(swmmInputFileName):
         tF.write("\n")
     for (i, linea) in enumerate(lineasOutfall):
         in0, in1, ancho = linea
-        list = ['SALIDA'+str(i), 'RECT_OPEN', xsG1, ancho, xsG3, xsG4]
+        list = ['SALIDA'+str(i), 'RECT_OPEN', params["xsG1"], ancho, params["xsG3"], params["xsG4"]]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -861,20 +860,27 @@ def mainCreateSWMM(swmmInputFileName):
     for key, value in transectas.items():
         tipo, tname, ancho, alto = value
         if (tipo == "channel"):
-            traTiranteArroyo = alto + coTapada
-            list = ['NC', traNArroyoPlanicie, traNArroyoPlanicie, traNArroyoCauce]
+            traTiranteArroyo = alto
+            list = ['NC', params["traNArroyoPlanicie"], params["traNArroyoPlanicie"], params["traNArroyoCauce"]]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
             list = ['X1', tname, 6, -ancho * 0.5, ancho * 0.5, 0, 0, 0, 0, 0, 0]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
-            # list = ['GR', -traAnchoMargenArroyo-ancho*0.5, traTiranteArroyo+20, -traAnchoMargenArroyo-ancho*0.5, traTiranteArroyo, -ancho*0.5, traTiranteArroyo, -ancho*0.5+1, 0, ancho*0.5-1, 0, ancho*0.5,traTiranteArroyo, traAnchoMargenArroyo+ancho*0.5, traTiranteArroyo, traAnchoMargenArroyo+ancho*0.5, traTiranteArroyo+20]
-            list = ['GR', traTiranteArroyo+20, -traAnchoMargenArroyo-ancho*0.5, traTiranteArroyo, -traAnchoMargenArroyo-ancho*0.5, traTiranteArroyo, -ancho*0.5, 0, -ancho*0.5+0.25, 0, ancho*0.5-0.25, traTiranteArroyo, ancho*0.5, traTiranteArroyo, traAnchoMargenArroyo+ancho*0.5, traTiranteArroyo+20, traAnchoMargenArroyo+ancho*0.5]
+            list = ['GR',
+                    traTiranteArroyo + 20, -params["traAnchoMargenArroyo"] - ancho*0.5,
+                    traTiranteArroyo, -params["traAnchoMargenArroyo"] - ancho*0.5,
+                    traTiranteArroyo, -ancho*0.5,
+                    0, -ancho*0.5 + 0.25,
+                    0, ancho*0.5 - 0.25,
+                    traTiranteArroyo, ancho*0.5,
+                    traTiranteArroyo, params["traAnchoMargenArroyo"] + ancho*0.5,
+                    traTiranteArroyo + 20, params["traAnchoMargenArroyo"] + ancho*0.5]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
             tF.write(";;-------------------------------------------\n")
         # elif (tipo == "conduit"):
-            # list = ['NC', traNConducto, traNConducto, traNConducto]
+            # list = ['NC', params["traNConducto"], params["traNConducto"], params["traNConducto"]]
             # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             # tF.write("\n")
             # list = ['X1', tname, 6, -ancho * 0.5, ancho * 0.5, 0, 0, 0, 0, 0, 0]
@@ -885,14 +891,22 @@ def mainCreateSWMM(swmmInputFileName):
             # tF.write("\n")
             # tF.write(";;-------------------------------------------\n")
         elif (tipo == "calle"):
-            list = ['NC', traNCalle, traNCalle, traNCalle]
+            list = ['NC', params["traNCalle"], params["traNCalle"], params["traNCalle"]]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
             list = ['X1', tname, 7, -ancho * 0.5, ancho * 0.5, 0, 0, 0, 0, 0, 0]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
-            # list = ['GR', -traAnchoVereda-ancho*0.5, traAltoCordon+20, -traAnchoVereda-ancho*0.5, traAltoCordon, -ancho*0.5, traAltoCordon, -ancho*0.5, 0, 0, traAltoCordon, ancho*0.5, 0, ancho*0.5, traAltoCordon, traAnchoVereda+ancho*0.5, traAltoCordon, traAnchoVereda+ancho*0.5, traAltoCordon+20]
-            list = ['GR', traAltoCordon+20, -traAnchoVereda-ancho*0.5, traAltoCordon, -traAnchoVereda-ancho*0.5, traAltoCordon, -ancho*0.5, 0, -ancho*0.5, traAltoCordon, 0, 0, ancho*0.5, traAltoCordon, ancho*0.5, traAltoCordon, traAnchoVereda+ancho*0.5, traAltoCordon+20, traAnchoVereda+ancho*0.5]
+            list = ['GR',
+                    params["traAltoCordon"] + 20, -params["traAnchoVereda"] - ancho*0.5,
+                    params["traAltoCordon"], -params["traAnchoVereda"] - ancho*0.5,
+                    params["traAltoCordon"], -ancho*0.5,
+                    0, -ancho*0.5,
+                    params["traAltoCordon"], 0,
+                    0, ancho*0.5,
+                    params["traAltoCordon"], ancho*0.5,
+                    params["traAltoCordon"], params["traAnchoVereda"] + ancho*0.5,
+                    params["traAltoCordon"] + 20, params["traAnchoVereda"] + ancho*0.5]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
             tF.write(";;-------------------------------------------\n")
