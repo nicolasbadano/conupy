@@ -320,8 +320,8 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Crear u obtener los nodos extremos
-        n0 = addNode(nodos, puntos[0], "esquina", geo_hash)
-        n1 = addNode(nodos, puntos[-1], "esquina", geo_hash)
+        n0 = addNode(nodos, puntos[0], "corner", geo_hash)
+        n1 = addNode(nodos, puntos[-1], "corner", geo_hash)
 
         # Si la polilinea es demasiado corta
         if n0 == n1:
@@ -333,31 +333,31 @@ def mainReadStreets(shpFileCalles):
             # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
             if n0 != n2:
                 # Crear un nuevo vertedero
-                links[(n0, n2)] = {"type":"vertedero", "w":ancho}
+                links[(n0, n2)] = {"type":"weir", "w":ancho}
             if n1 != n2:
                 # Crear un nuevo vertedero
-                links[(n1, n2)] = {"type":"vertedero", "w":ancho}
+                links[(n1, n2)] = {"type":"weir", "w":ancho}
         else:
             # No atraviesa --> crear una calle comun
-            links[(n0, n1)] = {"type":"calle", "w":ancho}
+            links[(n0, n1)] = {"type":"street", "w":ancho}
 
 
     # Crear sumideros
     print "Creando sumideros"
     tF.write("Creando sumideros\n")
     for (i, nodo) in enumerate(nodos):
-        if nodo[2] != "esquina":
+        if nodo[2] != "corner":
             continue
 
         # Buscar el nodo conducto mas cercano
         mindist, minj = params["maxDistGutter"], -1
         for (j, nodo2) in enumerate(nodos):
-            if nodo2[2] == "conducto":
+            if nodo2[2] == "conduit":
                 d = dist(nodo, nodo2)
                 if d < mindist:
                     mindist = d
                     minj = j
-            if nodo2[2] == "esquina":
+            if nodo2[2] == "corner":
                 break
         if minj == -1:
             continue
@@ -367,26 +367,26 @@ def mainReadStreets(shpFileCalles):
         if (n0, n1) in links or (n1, n0) in links:
             continue
         # Crear un sumidero
-        links[(n0, n1)] = {"type":"sumidero"}
+        links[(n0, n1)] = {"type":"gutter"}
 
 
     # Crear vertederos
     print "Creando vertederos"
     tF.write("Creando vertederos\n")
     for (i, nodo) in enumerate(nodos):
-        if nodo[2] != "esquina":
+        if nodo[2] != "corner":
             continue
 
         # Buscar el nodo arroyo mas cercano
         mindist, minj = params["maxDistWeir"], -1
         for (j, nodo2) in enumerate(nodos):
-            if nodo2[2] == "arroyo":
+            if nodo2[2] == "channel":
                 d = dist(nodo, nodo2)
                 if d < mindist:
                     mindist = d
                     minj = j
 
-            if nodo2[2] == "esquina":
+            if nodo2[2] == "corner":
                 break
         if minj == -1:
             continue
@@ -396,12 +396,12 @@ def mainReadStreets(shpFileCalles):
         if (n0, n1) in links or (n1, n0) in links:
             continue
         # Crear un vertedero
-        links[(n0, n1)] = {"type":"vertedero", "w":ancho}
+        links[(n0, n1)] = {"type":"weir", "w":ancho}
 
     # Crear centros de cuencas
     centros = []
     for (i, nodo) in enumerate(nodos):
-        if nodo[2] != "conducto":
+        if nodo[2] != "conduit":
             centros.append([nodo[0], nodo[1], i])
 
     print "Numero de nodos:   ", len(nodos)
@@ -487,7 +487,7 @@ def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileCoeficiente, ra
     # Bajar nodos arroyo
     #nodos = readFromFile('nodos')
     #for i in xrange(0,len(nodosElev)):
-    #    if (nodos[i][2] == "arroyo"):
+    #    if (nodos[i][2] == "channel"):
     #        nodosElev[i] -= 1.5
 
     saveOnFile(nodosElev, "nodosElev")
@@ -543,7 +543,7 @@ def mainCalculateInvertOffsets():
     for n0, n1 in links:
         link = links[(n0, n1)]
 
-        if link["type"] == "vertedero" or link["type"] == "sumidero":
+        if link["type"] == "weir" or link["type"] == "gutter":
             continue
 
         offset0, offset1 = 0, 0
@@ -579,7 +579,7 @@ def mainCreateSWMM(swmmInputFileName):
     nodosLongitudLineas = [0] * len(nodos)
     for (n0, n1) in links:
         link = links[(n0, n1)]
-        if link["type"] not in ["calle", "arroyo"]:
+        if link["type"] not in ["street", "channel"]:
             continue
         nodosLongitudLineas[n0] = nodosLongitudLineas[n0] + dist(nodos[n0], nodos[n1])
         nodosLongitudLineas[n1] = nodosLongitudLineas[n1] + dist(nodos[n0], nodos[n1])
@@ -719,7 +719,7 @@ def mainCreateSWMM(swmmInputFileName):
         link = links[(in0, in1)]
         name = link["type"] + str(i)
         length = dist(nodos[in0], nodos[in1])
-        if link["type"] == "calle":
+        if link["type"] == "street":
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodosElev[in0], "%.3f" % nodosElev[in1], 0]
         elif link["type"] in ["channel", "conduit"]:
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
@@ -742,9 +742,9 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;======================================================================================================================\n")
     for i, (in0, in1) in enumerate(links):
         link = links[(in0, in1)]
-        if link["type"] != "vertedero":
+        if link["type"] != "weir":
             continue
-        name = "vertedero" + str(i)
+        name = "weir" + str(i)
         list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDEFLOW", "%.3f" % (nodosElev[in0]+params["weAlturaCordon"]), params["weCd"], "NO"]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
@@ -756,9 +756,9 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;======================================================================================================================\n")
     for i, (in0, in1) in enumerate(links):
         link = links[(in0, in1)]
-        if link["type"] != "sumidero":
+        if link["type"] != "gutter":
             continue
-        name = "sumidero" + str(i)
+        name = "gutter" + str(i)
         list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDE", 0, "%.3f" % (nodosElev[in0]-params["traAltoCordon"]), "NO", 0]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
@@ -773,7 +773,7 @@ def mainCreateSWMM(swmmInputFileName):
         link = links[(in0, in1)]
         name = link["type"] + str(i)
 
-        if link["type"] == "calle":
+        if link["type"] == "street":
             tname = link["type"] + str(int(link["w"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
@@ -783,11 +783,11 @@ def mainCreateSWMM(swmmInputFileName):
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
         elif link["type"] == "conduit":
             list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0]
-        elif link["type"] == "vertedero":
-            list = ['vertedero'+str(i), 'RECT_OPEN', params["xsVertederoH"], params["xsVertederoW"], 0, 0]
-        elif link["type"] == "sumidero":
-            list = ['sumidero'+str(i), 'RECT_CLOSED', params["xsSumideroH"], params["xsSumideroW"], 0, 0]
-        elif link["type"] == "calle":
+        elif link["type"] == "weir":
+            list = [link["type"]+str(i), 'RECT_OPEN', params["xsVertederoH"], params["xsVertederoW"], 0, 0]
+        elif link["type"] == "gutter":
+            list = [link["type"]+str(i), 'RECT_CLOSED', params["xsSumideroH"], params["xsSumideroW"], 0, 0]
+        elif link["type"] == "street":
             tname = link["type"] + str(int(link["w"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
@@ -841,7 +841,7 @@ def mainCreateSWMM(swmmInputFileName):
             # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             # tF.write("\n")
             # tF.write(";;-------------------------------------------\n")
-        elif (tipo == "calle"):
+        elif (tipo == "street"):
             list = ['NC', params["traNCalle"], params["traNCalle"], params["traNCalle"]]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")

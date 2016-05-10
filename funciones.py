@@ -61,10 +61,10 @@ def removePoints(points, maxLength = 25):
 def atraviesaArroyo(p0, p1, nodos, links):
     for n0, n1 in links:
         link = links[(n0, n1)]
-        if link["type"] == "arroyo":
+        if link["type"] == "channel":
             if (intersect(p0, p1, nodos[n0], nodos[n1])):
                 return n0
-        if link["type"] == "calle":
+        if link["type"] == "street":
             break
 
     return -1
@@ -91,33 +91,33 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
     for i in nodosCercanos:
         nodo = nodos[i]
         if distSq(nodo, punto) < tolSq:
-            if nodo[2] == "conducto":
+            if nodo[2] == "conduit":
                 # Si llega al menos un arroyo a un nodo conducto, pasa a ser nodo arroyo
-                if tipo == "arroyo":
-                    nodos[i][2] = "arroyo"
+                if tipo == "channel":
+                    nodos[i][2] = "channel"
                     return i
-                elif tipo == "conducto":
+                elif tipo == "conduit":
                     return i
                 # Si se quiere crear un nodo esquina cerca de uno conducto, no los une
-                elif tipo == "esquina":
+                elif tipo == "corner":
                     continue
 
-            elif nodo[2] == "esquina":
-                if tipo == "arroyo":
+            elif nodo[2] == "corner":
+                if tipo == "channel":
                     #Esto no debería ocurrir, porque los arroyos se crean antes que las esquinas
                     return i
-                elif tipo == "conducto":
+                elif tipo == "conduit":
                     #Esto no debería ocurrir, porque los arroyos se crean antes que las esquinas
                     continue
-                elif tipo == "esquina":
+                elif tipo == "corner":
                     return i
 
-            elif nodo[2] == "arroyo":
-                if tipo == "arroyo":
+            elif nodo[2] == "channel":
+                if tipo == "channel":
                     return i
-                elif tipo == "conducto":
+                elif tipo == "conduit":
                     return i
-                elif tipo == "esquina":
+                elif tipo == "corner":
                     return i
 
     # Si no hay nodos cercanos, agregar uno
