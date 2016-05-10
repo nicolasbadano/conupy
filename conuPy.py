@@ -75,6 +75,11 @@ params["maxDistWeir"] = 50.0
 # Max dist for which outfall nodes are connected to regular nodes
 params["maxDistConnectOutfallNodes"] = 50.0
 
+# % of the basin area in which water is stored in a node
+params["juApondPer"] = 0.75
+# Water depth at start of simulation (ft or m) (default is 0).
+params["juY0"] = 0
+
 params["evap"] = 4.0 # mm/dia
 # Manning's n for overland flow over the impervious sub-area.
 params["saNImp"] = 0.025
@@ -581,7 +586,7 @@ def mainCreateSWMM(swmmInputFileName):
 
     areasNodo = [1.167] * len(nodos)
     for (i, centro) in enumerate(centros):
-        areasNodo[centro[2]] = juApondPer * subcuencas[i][1]
+        areasNodo[centro[2]] = params["juApondPer"] * subcuencas[i][1]
 
     tF = open(swmmInputFileName, "w")
     tF.write("[TITLE]\n")
@@ -657,21 +662,19 @@ def mainCreateSWMM(swmmInputFileName):
 
     # Depth from ground to invert elevation (ft or m) (default is 0).
     # juYmax = 1.0
-    # Water depth at start of simulation (ft or m) (default is 0).
-    # juY0 = 0
     # maximum additional head above ground elevation that manhole junction can sustain under surcharge conditions (ft or m) (default is 0).
     # juYsur = 0
     # % del area de la subcuenca en que se almacena el agua en el nodo
-    # juApondPer = 0.75
+    # params["juApondPer"] = 0.75
     # tF.write("\n")
     # tF.write("[JUNCTIONS]\n")
     # tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
     # tF.write(";;========================================================================================\n")
     # areasNodo = [75.54] * len(nodos)
     # for (i, centro) in enumerate(centros):
-        # areasNodo[centro[2]] = juApondPer * subcuencas[i][1]
+        # areasNodo[centro[2]] = params["juApondPer"] * subcuencas[i][1]
     # for (i, nodo) in enumerate(nodos):
-        # list = ['NODO'+str(i), nodosElev[i]+nodosInvElevOffset[i], juYmax-nodosInvElevOffset[i], juY0, juYsur, "%.3f" % areasNodo[i]]
+        # list = ['NODO'+str(i), nodosElev[i]+nodosInvElevOffset[i], juYmax-nodosInvElevOffset[i], params["juY0"], juYsur, "%.3f" % areasNodo[i]]
         # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         # tF.write("\n")
 
@@ -681,7 +684,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Elev           Ymax           Y0             TABULAR        Apond          ) \n")
     tF.write(";;========================================================================================\n")
     for (i, nodo) in enumerate(nodos):
-        list = ['NODO'+str(i), "%.3f" % (nodosElev[i]+nodosInvElevOffset[i]), "%.3f" % (-nodosInvElevOffset[i]+20), juY0, 'TABULAR', 'STORAGE'+str(i), "%.3f" % (areasNodo[i])]
+        list = ['NODO'+str(i), "%.3f" % (nodosElev[i]+nodosInvElevOffset[i]), "%.3f" % (-nodosInvElevOffset[i]+20), params["juY0"], 'TABULAR', 'STORAGE'+str(i), "%.3f" % (areasNodo[i])]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
