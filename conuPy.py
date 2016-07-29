@@ -476,12 +476,11 @@ def mainGetSubcatchments(shpFileCuenca):
     print "Finalizado proceso de creado de cuencas"
 
 
-def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileCoeficiente, rasterFileImpermeabilidad):
+def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad):
     print "Proceso de muestreo de datos..."
 
     nodosElev = sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
     nodosSlope = sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
-    nodosCoeficiente = sample_raster_on_nodes(shpFileNodos, rasterFileCoeficiente)
     nodosImpermeabilidad = sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
 
     # Bajar nodos arroyo
@@ -558,6 +557,87 @@ def mainCalculateInvertOffsets():
     print "Finalizado el calculo de inverts"
 
 
+def mainCreateRainGagesMethod0(gageFileName, rasterFileCoeficiente, gagesFileName):
+
+    print "Leyendo pluviometro único..."
+    iFile = open(gageFileName, "r")
+    lineas = iFile.readlines()
+    iFile.close()
+
+
+    print "Creando estaciones..."
+    gages = []
+    tF = open(gagesFileName, "w")
+    for i in xrange(0,numGages):
+        coef = i * (100/(numGages-1))
+
+        gage = {}
+        gage["name"] = 'GAGE'+str(coef)
+        gage["file"] = gagesFileName
+        gage["interval"] = '0:05'
+        gages.append[gage]
+
+        for linea in lineas:
+            datos = linea.split()
+            if len(datos) == 0:
+                continue
+            datos[0]  = gage["name"]
+            datos[-1] = float(datos[-1])*(float(coef)/100.0)
+            tF.write(("").join([ str(x).ljust(15, ' ') for x in datos]))
+            tF.write("\n")
+
+    print "Leyendo mapa de decaimiento"
+    nodosDecaimiento = sample_raster_on_nodes(shpFileNodos, rasterFileCoeficiente)
+
+    print "Seleccionando pluviómetro para cada subcuenca"
+    subcatchmentGages = []
+    centros = readFromFile('centros')
+    for (i, centro) in enumerate(centros):
+        coef = int(nodosDecaimiento[centro[2]])
+        gageName = 'GAGE' + str(coef - (coef%(100/(numGages-1))))
+        subcatchmentGages.append(gageName)
+
+    saveOnFile(gages, "gages")
+    saveOnFile(subcatchmentGages, "subcatchmentGages")
+
+    print "Finalizado el procesamiento de pluviómetros"
+
+def mainCreateRainGagesMethod1(stationsFileName):
+
+    print "Leyendo lista de pluviometros..."
+    gages = []
+    with open(stationsFileName, "r") as f:
+        for i, line in enumerate(f):
+            data = line.split()
+            gage = {}
+            gage["coord"] = [float(data[0]), float(data[1])]
+            gage["name"] = data[2]
+            gage["file"] = data[3]
+            gage["interval"] = '0:05'
+            gages.append(gage)
+
+    print "Seleccionando pluviómetro para cada subcuenca..."
+    subcatchmentGages = []
+    centros = readFromFile('centros')
+    for (i, centro) in enumerate(centros):
+        minDistSq = 1e10
+        minGage = None
+
+        for gage in gages:
+            gDistSq = distSq(gage["coord"], centro)
+
+            if gDistSq < minDistSq:
+                minGage = gage
+                minDistSq = gDistSq
+
+        subcatchmentGages.append(minGage["name"])
+
+    saveOnFile(gages, "gages")
+    saveOnFile(subcatchmentGages, "subcatchmentGages")
+
+    print "Finalizado el procesamiento de pluviómetros"
+
+
 def mainCreateSWMM(swmmInputFileName):
     print "Proceso de escritura de archivo SWMM..."
 
@@ -573,8 +653,10 @@ def mainCreateSWMM(swmmInputFileName):
 
     nodosElev = readFromFile('nodosElev')
     nodosSlope = readFromFile('nodosSlope')
-    nodosCoeficiente = readFromFile('nodosCoeficiente')
     nodosImpermeabilidad = readFromFile('nodosImpermeabilidad')
+
+    gages = readFromFile('gages')
+    subcatchmentGages = readFromFile('subcatchmentGages')
 
     nodosLongitudLineas = [0] * len(nodos)
     for (n0, n1) in links:
@@ -619,9 +701,8 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write("[RAINGAGES]\n")
     tF.write(";;Name         Format         Interval       SCF            DataSrc        SourceName     Sta            Units\n")
     tF.write(";;============================================================================================================\n")
-    for i in xrange(0,numGages):
-        gageName = 'GAGE'+str(i * (100/(numGages-1)))
-        list = [gageName, 'INTENSITY', '0:05', 1.0, 'FILE', "pluviom.dat", gageName, "MM"]
+    for gage in gages:
+        list = [gage["name"], 'INTENSITY', gage["interval"], 1.0, 'FILE', gage["file"], gage["name"], "MM"]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -635,8 +716,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;======================================================================================================================\n")
     for (i, centro) in enumerate(centros):
         numNodo = centro[2]
-        coef = int(nodosCoeficiente[numNodo])
-        gageName = 'GAGE' + str(coef - (coef%(100/(numGages-1))))
+        gageName = subcatchmentGages[i]
         list = ['CUENCA'+str(i), gageName, 'NODO'+str(numNodo), "%.3f" % (float(subcuencas[i][1])/10000.0), "%.3f" % nodosImpermeabilidad[numNodo], "%.3f" % (nodosLongitudLineas[numNodo]/2), "%.3f" % (nodosSlope[numNodo]), "%.3f" % (subcuencas[i][1]**0.5)]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
@@ -971,29 +1051,6 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
         campos["depth"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) for j in range(1,len(dataline))]
         campos["elev"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) + nodosElev[j-1] for j in range(1,len(dataline))]
         escribir_shp_puntos("nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
-
-
-def mainCreateGenerateRain(gageFileName, gagesFileName):
-    print "Leyendo pluviometro..."
-    iFile = open(gageFileName, "r")
-    lineas = iFile.readlines()
-    iFile.close()
-
-    print "Escribiendo estaciones..."
-    tF = open(gagesFileName, "w")
-    for i in xrange(0,numGages):
-        coef = i * (100/(numGages-1))
-        gageName = 'GAGE'+str(coef)
-        for linea in lineas:
-            datos = linea.split()
-            if len(datos) == 0:
-                continue
-            datos[0]  = gageName
-            datos[-1] = float(datos[-1])*(float(coef)/100.0)
-            tF.write(("").join([ str(x).ljust(15, ' ') for x in datos]))
-            tF.write("\n")
-
-    print "Estaciones listas"
 
 
 def mainCalculateDeadDepths():

@@ -73,6 +73,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.btnWorkspace.clicked.connect(self.btnWorkspace_click)
         self.btnModelDirectory.clicked.connect(self.btnModelDirectory_click)
         self.btnRain.clicked.connect(self.btnRain_click)
+        self.btnStations.clicked.connect(self.btnStations_click)
 
         self.btnActionLimpiarWorkspace.clicked.connect(self.btnActionLimpiarWorkspace_click)
         self.btnActionPrepareDrainageNetwork.clicked.connect(self.btnActionPrepareDrainageNetwork_click)
@@ -85,6 +86,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.btnActionGenerateRain.clicked.connect(self.btnActionGenerateRain_click)
         self.btnActionProfMuertas.clicked.connect(self.btnActionProfMuertas_click)
         self.btnActionExtraerProf.clicked.connect(self.btnActionExtraerProf_click)
+
+        self.cbbPrecipitationMethod.currentIndexChanged.connect(self.leer_datos_generales)
 
         # Enlazar los Event Handlers de las cajas de texto
         self.connect(self.textShpFileDrainageNetworkOriginal,
@@ -126,6 +129,9 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.connect(self.textRainFileName,
                         QtCore.SIGNAL("textEdited(QString)"),
                         self.leer_datos_generales)
+        self.connect(self.textStationsFileName,
+                        QtCore.SIGNAL("textEdited(QString)"),
+                        self.leer_datos_generales)
         self.nuevo()
 
     def nuevo(self):
@@ -144,6 +150,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         self.modelFolder = ""
         self.modelFileName = "model"
         self.rainFileName = ""
+        self.stationsFileName = ""
+        self.precipitationMethod = 0
 
         self.actualizar_datos_generales()
 
@@ -161,7 +169,9 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             "workspace", \
             "modelFolder", \
             "modelFileName", \
-            "rainFileName"]
+            "rainFileName", \
+            "stationsFileName", \
+            "precipitationMethod"]
 
         return dict([ (name, getattr(self, name)) for name in variables])
 
@@ -226,11 +236,18 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             self.textModelDirectory.setText(str(self.modelFolder))
             self.textModelFileName.setText(str(self.modelFileName))
             self.textRainFileName.setText(str(self.rainFileName))
+            self.textStationsFileName.setText(str(self.stationsFileName))
+            self.cbbPrecipitationMethod.setCurrentIndex(self.precipitationMethod)
+
+            groups = [self.groupPrecipitationMethod0, self.groupPrecipitationMethod1]
+            for group in groups:
+                group.setEnabled(False)
+            groups[self.precipitationMethod].setEnabled(True)
+
         except: pass
 
     def leer_datos_generales(self):
         try:
-            pass
             self.shpFileDrainageNetworkOriginal = self.textShpFileDrainageNetworkOriginal.text()
             self.shpFileDrainageNetworkPrepared = self.textShpFileDrainageNetworkPrepared.text()
             self.shpFileCalles = self.textShpFileCalles.text()
@@ -244,6 +261,10 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             self.modelFolder = self.textModelDirectory.text()
             self.modelFileName = self.textModelFileName.text()
             self.rainFileName = self.textRainFileName.text()
+            self.stationsFileName = self.textStationsFileName.text()
+            self.precipitationMethod = self.cbbPrecipitationMethod.currentIndex()
+
+            self.actualizar_datos_generales()
         except: pass
 
     # Event handlers de btnDrainageNetworkOriginal
@@ -362,6 +383,15 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             self.textRainFileName.setText(text)
             self.leer_datos_generales()
 
+    # Event handlers de btnStations
+    def btnStations_click(self):
+        text = QtGui.QFileDialog.getOpenFileName(self, u'Seleccionar archivo estaciones',
+            self.last_path, u"Estaciones (*.txt)")
+        if text is not None and not str(text) == "":
+            self.last_path = os.path.dirname(text)
+            self.textStationsFileName.setText(text)
+            self.leer_datos_generales()
+
     # Event handlers de btnActionLimpiarWorkspace
     def btnActionLimpiarWorkspace_click(self):
         # Redireccionar stdout a la caja de texto
@@ -403,7 +433,6 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         os.chdir(self.workspace)
         conuPy.mainSampleNodeData(self.rasterFileDEM,
                                   self.rasterFileSlope,
-                                  self.rasterFileCoeficiente,
                                   self.rasterFileImpermeabilidad)
 
     # Event handlers de btnActionBordes
@@ -436,7 +465,13 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         sys.stdout = WriteStreamInmediate(self.textInfo)
 
         os.chdir(self.workspace)
-        conuPy.mainCreateGenerateRain(self.rainFileName, self.modelFolder + "/" + "pluviom.dat")
+
+        if self.precipitationMethod == 0:
+            conuPy.mainCreateRainGagesMethod0(self.rainFileName,
+                                              self.rasterFileCoeficiente,
+                                              self.modelFolder + "/" + "pluviom.dat")
+        elif self.precipitationMethod == 1:
+            conuPy.mainCreateRainGagesMethod1(self.stationsFileName)
 
     # Event handlers de btnActionProfMuertas
     def btnActionProfMuertas_click(self):
