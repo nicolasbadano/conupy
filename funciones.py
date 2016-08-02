@@ -79,7 +79,6 @@ def atraviesaArroyo(p0, p1, nodos, links):
     for (n0, n1), link in links.iteritems():
         if link["type"] == "channel":
             if (intersect(p0, p1, nodos[n0], nodos[n1])):
-                print n0, n1, link
                 return n0, n1, link
 
     return None
