@@ -58,13 +58,15 @@ class OutFile:
     Pollutant = collections.namedtuple('Pollutant',
         'name units')
 
-    def __init__(self, fh):
+    def __init__(self, fh, swmm_version = "5.1"):
         ''' Initialise the OutFile instance with an open file object. Some
         information is read from the file at this stage too, namely some
         metadata (e.g. start time, number of objects, etc), the object names,
         the reported variable names, and the object info. No timeseries data is
         read here.
         '''
+        # The swmm version
+        self.swmm_version = swmm_version
         # The opened file object
         self._fh = fh
         # Set up some lists
@@ -81,7 +83,7 @@ class OutFile:
         self.count_vars_cats = 0
         self.count_vars_nodes = 0
         self.count_vars_links = 0
-        self.count_vars_system = 15
+        self.count_vars_system = 14 if self.swmm_version == "5.1" else 15
         # Start time (a datetime object)
         self.start = None
         # Duration of each timestep (a timedelta object)
@@ -226,7 +228,7 @@ class OutFile:
         self.count_nodes = self.getint()
         self.count_links = self.getint()
         self.count_pollutants = self.getint()
-        self.count_vars_cats = 8 + self.count_pollutants
+        self.count_vars_cats = (6 if self.swmm_version == "5.1" else 8) + self.count_pollutants
         self.count_vars_nodes = 6 + self.count_pollutants
         self.count_vars_links = 5 + self.count_pollutants
 
@@ -297,40 +299,68 @@ class OutFile:
         # The pollutant concentrations are 'conc pollutant_name', e.g.
         # if there is a pollutant named 'TSS', the concentration variable
         # will be 'conc TSS'
-        self.variables['subcatchments'] = ['rainfall',
-                                          'snow depth',
-                                          'evaporation',
-                                          'infiltration',
-                                          'runoff',
-                                          'groundwater flow',
-                                          'groundwater elevation',
-                                          'soil moister']
+        if self.swmm_version == "5.1":
+            self.variables['subcatchments'] = ['rainfall',
+                                              'snow depth',
+                                              'losses',
+                                              'runoff',
+                                              'groundwater flow',
+                                              'groundwater elevation']
+            self.variables['links'] = ['flow',
+                                       'depth',
+                                       'velocity',
+                                       'Froude',
+                                       'capacity']
+            self.variables['system'] = ['temperature',
+                                        'rainfall',
+                                        'snow depth',
+                                        'losses',
+                                        'runoff',
+                                        'dry weather inflow',
+                                        'groundwater inflow',
+                                        'RDII inflow',
+                                        'direct inflow',
+                                        'total inflow',
+                                        'flooding',
+                                        'outflow',
+                                        'storage',
+                                        'evaporation']
+        else:
+            self.variables['subcatchments'] = ['rainfall',
+                                              'snow depth',
+                                              'evaporation',
+                                              'infiltration',
+                                              'runoff',
+                                              'groundwater flow',
+                                              'groundwater elevation',
+                                              'soil moister']
+            self.variables['links'] = ['flow',
+                                       'depth',
+                                       'velocity',
+                                       'volume',
+                                       'capacity']
+            self.variables['system'] = ['temperature',
+                                        'rainfall',
+                                        'snow depth',
+                                        'infiltration',
+                                        'runoff',
+                                        'dry weather inflow',
+                                        'groundwater inflow',
+                                        'RDII inflow',
+                                        'direct inflow',
+                                        'total inflow',
+                                        'flooding',
+                                        'outflow',
+                                        'storage',
+                                        'evaporation',
+                                        'potential_evaporation']
         self.variables['nodes'] = ['depth',
                                    'head',
                                    'storage',
                                    'lateral inflow',
                                    'total inflow',
                                    'flooding']
-        self.variables['links'] = ['flow',
-                                   'depth',
-                                   'velocity',
-                                   'volume',
-                                   'capacity']
-        self.variables['system'] = ['temperature',
-                                    'rainfall',
-                                    'snow depth',
-                                    'infiltration',
-                                    'runoff',
-                                    'dry weather inflow',
-                                    'groundwater inflow',
-                                    'RDII inflow',
-                                    'direct inflow',
-                                    'total inflow',
-                                    'flooding',
-                                    'outflow',
-                                    'storage',
-                                    'evaporation',
-                                    'potential_evaporation']
+
         for p in self.names['pollutants']:
             for vars in ['subcatchments', 'nodes', 'links']:
                 self.variables[vars].append('conc {0}'.format(p))
@@ -401,10 +431,10 @@ class OutFile:
 # Replace the builtin open function
 __builtin_open = open
 
-def open(filename):
+def open(filename, swmm_version = "5.1"):
     ''' Open a SWMM .out file and return an `~swmmout.OutFile` instance. '''
     fh = __builtin_open(filename, 'rb')
-    return OutFile(fh)
+    return OutFile(fh, swmm_version)
 
 
 ################################################################################
