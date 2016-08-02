@@ -2,6 +2,7 @@
 import math
 import pickle
 from itertools import tee, izip
+import numpy as np
 
 def saveOnFile( data, name ):
     oF = open(name + ".pkl", 'wb')
@@ -18,6 +19,22 @@ def readFromFile( name ):
 
 def dist(p0, p1):
     return ((p0[0]-p1[0])**2+(p0[1]-p1[1])**2)**0.5
+
+
+def distToSegment(p0, p10, p11):
+    r = p0 - p10
+    n = p11 - p10
+
+    n_norm = np.linalg.norm(n)
+    nn = n / n_norm
+    alpha = np.dot(nn, r)
+
+    if alpha < 0:
+        return np.linalg.norm(r)
+    elif alpha > n_norm:
+        return np.linalg.norm(p0 - p11)
+
+    return np.linalg.norm(r - nn * alpha)
 
 
 def distSq(p0, p1):

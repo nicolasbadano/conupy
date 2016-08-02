@@ -19,6 +19,7 @@ elif engine == "qgis_standalone":
 
 from funciones import *
 import swmmout
+import numpy as np
 
 # Origen de datos
 dataFolder = "F:/Desarrollo/Utilidades/conuPy/Ejemplos/CONUPY_cuenca completa1/"
@@ -70,8 +71,8 @@ params["minLengthForStreamSpanJoin"] = 75.0
 params["minCoverage"] = 0.3
 # Max distance required for gutters to be created from a corner to a conduit node
 params["maxDistGutter"] = 80.0
-# Max distance required for weirs to be created from a corner to a channel node
-params["maxDistWeir"] = 50.0
+# Max distance required for weirs to be created from a corner to a channel segment
+params["maxDistWeir"] = 20.0
 # Max dist for which outfall nodes are connected to regular nodes
 params["maxDistConnectOutfallNodes"] = 50.0
 
@@ -373,24 +374,25 @@ def mainReadStreets(shpFileCalles):
     # Crear vertederos
     print "Creando vertederos"
     tF.write("Creando vertederos\n")
+    # Crear un array con todos los segmentos de canal
+    channels = [(np.array(nodos[n0][0:2]), np.array(nodos[n1][0:2]), n0, n1) for ((n0, n1), link) in links.iteritems() if link["type"] == "channel"]
     for (i, nodo) in enumerate(nodos):
         if nodo[2] != "corner":
             continue
 
-        # Buscar el nodo arroyo mas cercano
+        p = np.array(nodo[0:2])
+        # Buscar el tramo de arroyo mas cercano
         mindist, minj = params["maxDistWeir"], -1
-        for (j, nodo2) in enumerate(nodos):
-            if nodo2[2] == "channel":
-                d = dist(nodo, nodo2)
-                if d < mindist:
-                    mindist = d
-                    minj = j
+        for p10, p11, n10, n11 in channels:
+            d = distToSegment(p, p10, p11)
+            if d < mindist:
+                mindist = d
+                minj = n10 if dist(p, p10) <= dist(p, p11) else n11
 
-            if nodo2[2] == "corner":
-                break
         if minj == -1:
             continue
-        # Existe un nodo arroyo cerca
+
+        # Existe un nodo arroyo cerca, conectar
         n0, n1 = i, minj
         # Si ya existe una conexión entre los nodos
         if (n0, n1) in links or (n1, n0) in links:
