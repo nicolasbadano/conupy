@@ -76,19 +76,23 @@ def removePoints(points, maxLength = 25):
 
 
 def atraviesaArroyo(p0, p1, nodos, links):
-    for n0, n1 in links:
-        link = links[(n0, n1)]
+    for (n0, n1), link in links.iteritems():
         if link["type"] == "channel":
             if (intersect(p0, p1, nodos[n0], nodos[n1])):
-                return n0
-        if link["type"] == "street":
-            break
+                print n0, n1, link
+                return n0, n1, link
 
-    return -1
+    return None
 
 
 def ccw(A,B,C):
     return (C[1]-A[1])*(B[0]-A[0]) > (B[1]-A[1])*(C[0]-A[0])
+
+
+def intersection(P1,P2,P3,P4):
+    return [
+        ((P1[0]*P2[1] - P1[1]*P2[0]) * (P3[0] - P4[0]) - (P1[0] - P2[0]) * (P3[0]*P4[1] - P3[1]*P4[0])) / ((P1[0] - P2[0]) * (P3[1] - P4[1]) - (P1[1] - P2[1]) * (P3[0] - P4[0])),
+        ((P1[0]*P2[1] - P1[1]*P2[0]) * (P3[1] - P4[1]) - (P1[1] - P2[1]) * (P3[0]*P4[1] - P3[1]*P4[0])) / ((P1[0] - P2[0]) * (P3[1] - P4[1]) - (P1[1] - P2[1]) * (P3[0] - P4[0]))]
 
 
 def intersect(A,B,C,D):
@@ -96,6 +100,12 @@ def intersect(A,B,C,D):
 
 
 def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
+    if not any(geo_hash):
+        # The geo_hash is empty, populate it
+        for nodo in nodos:
+            ix, iy = int(nodo[0]/1000.0), int(nodo[1]/1000.0)
+            geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
+            geo_hash[(ix,iy)].append(len(nodos)-1)
 
     ix, iy = int(punto[0]/1000.0), int(punto[1]/1000.0)
     nodosCercanos = []

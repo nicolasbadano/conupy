@@ -329,15 +329,44 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Verificar si la calle atraviesa un arroyo
-        n2 = atraviesaArroyo(puntos[0], puntos[-1], nodos, links)
-        if (n2 != -1):
+        channel_data = atraviesaArroyo(nodos[n0], nodos[n1], nodos, links)
+
+        if channel_data is not None:
+            nch0, nch1, channel_link = channel_data
+            p4 = intersection(nodos[n0], nodos[n1], nodos[nch0], nodos[nch1])
+            print n0, p4
+
+            nchannel = nch0 if dist(nodos[nch0], p4) <= dist(nodos[nch1], p4) else nch1
+
+            # Dividir primero el arroyo si vale la pena (distancia al nodo más
+            # cercano > a 15% maxLengthForStreamSpanDivide)
+            if (min(dist(nodos[nch0], p4), dist(nodos[nch1], p4)) >
+                params["maxLengthForStreamSpanDivide"] * 0.15):
+
+                nchannel = addNode(nodos, p4, "channel", geo_hash, 0)
+
+                alpha = dist(nodos[nch0], nodos[nchannel]) / dist(nodos[nch0], nodos[nch1])
+                levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
+
+                links[(nch0, nchannel)] = {"type": channel_link["type"],
+                                           "w": channel_link["w"],
+                                           "h": channel_link["h"],
+                                           "levelIni": channel_link["levelIni"],
+                                           "levelFin": levelMid}
+                links[(nchannel, nch1)] = {"type": channel_link["type"],
+                                           "w": channel_link["w"],
+                                           "h": channel_link["h"],
+                                           "levelIni": levelMid,
+                                           "levelFin": channel_link["levelFin"]}
+                del links[(nch0, nch1)]
+
             # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
-            if n0 != n2:
+            if n0 != nchannel:
                 # Crear un nuevo vertedero
-                links[(n0, n2)] = {"type":"weir", "w":ancho}
-            if n1 != n2:
+                links[(n0, nchannel)] = {"type":"weir", "w":ancho}
+            if n1 != nchannel:
                 # Crear un nuevo vertedero
-                links[(n1, n2)] = {"type":"weir", "w":ancho}
+                links[(n1, nchannel)] = {"type":"weir", "w":ancho}
         else:
             # No atraviesa --> crear una calle comun
             links[(n0, n1)] = {"type":"street", "w":ancho}
