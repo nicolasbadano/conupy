@@ -514,15 +514,8 @@ def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad
     nodosSlope = sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
     nodosImpermeabilidad = sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
 
-    # Bajar nodos arroyo
-    #nodos = readFromFile('nodos')
-    #for i in xrange(0,len(nodosElev)):
-    #    if (nodos[i][2] == "channel"):
-    #        nodosElev[i] -= 1.5
-
     saveOnFile(nodosElev, "nodosElev")
     saveOnFile(nodosSlope, "nodosSlope")
-    saveOnFile(nodosCoeficiente, "nodosCoeficiente")
     saveOnFile(nodosImpermeabilidad, "nodosImpermeabilidad")
     print "Finalizado proceso de generacion de muestreo"
 
