@@ -101,10 +101,10 @@ def intersect(A,B,C,D):
 def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
     if not any(geo_hash):
         # The geo_hash is empty, populate it
-        for nodo in nodos:
+        for i, nodo in enumerate(nodos):
             ix, iy = int(nodo[0]/1000.0), int(nodo[1]/1000.0)
             geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
-            geo_hash[(ix,iy)].append(len(nodos)-1)
+            geo_hash[(ix,iy)].append(i)
 
     ix, iy = int(punto[0]/1000.0), int(punto[1]/1000.0)
     nodosCercanos = []

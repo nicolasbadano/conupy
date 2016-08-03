@@ -299,11 +299,6 @@ def mainReadStreets(shpFileCalles):
     links = readFromFile('linksArroyo')
 
     geo_hash = {}
-    for i, nodo in enumerate(nodos):
-        ix, iy = int(nodo[0]/10.0), int(nodo[1]/10.0)
-        geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
-        geo_hash[(ix,iy)].append(i)
-
     for (i,calle) in enumerate(calles):
         if i % 100 == 0:
             print "Procesando calle " + str(i) + " de " + str(len(calles))
