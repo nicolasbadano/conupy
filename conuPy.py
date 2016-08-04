@@ -220,52 +220,51 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
 
     # Read the prepared drainage network
     streams = leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+    streams = [Bunch(points = stream[0],
+                     w = stream[1],
+                     h = stream[2],
+                     typ = str(stream[3]).lower(),
+                     levelIni = stream[6],
+                     levelFin = stream[7]) for stream in streams]
 
     # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide (100m)
     for stream in streams:
-        insertPoints(stream[0], params["maxLengthForStreamSpanDivide"])
+        insertPoints(stream.points, params["maxLengthForStreamSpanDivide"])
 
+    snappedPoints = []
     # Snap the end nodes of each stream to nearby nodes of other streams
     for stream in streams:
         def snap(p, stream, streams):
-            for streamo in streams:
-                if (stream == streamo):
+            for targetStream in streams:
+                if (stream == targetStream):
                     continue
                 mindistSq, minj = pow(params["maxDistSnapStreamNodes"], 2), -1
-                for (j, p2) in enumerate(streamo[0]):
+                for (j, p2) in enumerate(targetStream.points):
                     dSq = distSq(p, p2)
                     if dSq < mindistSq:
-                        mindistSq = dSq
-                        minj = j
+                        mindistSq, minj = dSq, j
                 if minj == -1:
                     continue
-                streamo[0][minj].append("snapped")
-                return streamo[0][minj]
+                snappedPoints.append(targetStream.points[minj])
+                return targetStream.points[minj]
             return p
 
-        stream[0][0]  = snap(stream[0][0],  stream, streams)
-        stream[0][-1] = snap(stream[0][-1], stream, streams)
+        stream.points[0]  = snap(stream.points[0],  stream, streams)
+        stream.points[-1] = snap(stream.points[-1], stream, streams)
 
 
     # Join streams spans shorter than minLengthForStreamSpanJoin (75m) unless they've been "snapped"
     for stream in streams:
-        removePoints(stream[0], params["minLengthForStreamSpanJoin"])
-
-    for stream in streams:
-        points, w, h, typ = stream[0], stream[1], stream[2], stream[3]
-        for punto in points:
-            if punto[-1] == "snapped":
-                del punto[-1]
+        removePoints(stream.points, params["minLengthForStreamSpanJoin"], snappedPoints)
 
     # Create nodes and links for the drainage network
     nodos = []
     links = OrderedDict()
     geo_hash = {}
     for stream in streams:
-        points, w, h, typ, levelIni, levelFin = stream[0], stream[1], stream[2], stream[3], stream[6], stream[7]
-        tipoTramo = "conduit" if str(typ).lower() in ["entubado", "conducto", "conduit"] else "channel"
+        tipoTramo = "conduit" if stream.typ in ["entubado", "conducto", "conduit"] else "channel"
 
-        nodesn = [addNode(nodos, p, tipoTramo, geo_hash) for p in points]
+        nodesn = [addNode(nodos, p, tipoTramo, geo_hash) for p in stream.points]
         length = sum(dist(nodos[n0].p, nodos[n1].p) for n0, n1 in pairwise(nodesn))
         progFin = 0
         for n0, n1 in pairwise(nodesn):
@@ -275,10 +274,10 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
                 continue
             # Create a new link
             links[(n0, n1)] = {"type": tipoTramo,
-                               "w": w,
-                               "h": h,
-                               "levelIni": levelIni + (levelFin - levelIni) * progIni / length,
-                               "levelFin": levelIni + (levelFin - levelIni) * progFin / length}
+                               "w": stream.w,
+                               "h": stream.h,
+                               "levelIni": stream.levelIni + (stream.levelFin - stream.levelIni) * progIni / length,
+                               "levelFin": stream.levelIni + (stream.levelFin - stream.levelIni) * progFin / length}
 
     print "\tNumber of nodes for the drainage network: %i" % len(nodos)
     print "\tNumber of links for the drainage network: %i" % len(links)

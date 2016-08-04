@@ -62,7 +62,7 @@ def insertPoints(points, maxLength = 50):
             i += 1
 
 
-def removePoints(points, maxLength = 25):
+def removePoints(points, maxLength = 25, snappedPoints):
     i = 1
     while (i<len(points)-1):
         p2 = points[i-1]
@@ -70,7 +70,11 @@ def removePoints(points, maxLength = 25):
         p1 = points[i+1]
         lengthAnterior = dist(p2, p0)
         lengthSiguiente = dist(p0, p1)
-        if lengthAnterior < maxLength and lengthSiguiente < maxLength and p0[-1] != "snapped":
+
+        if (lengthAnterior < maxLength and
+            lengthSiguiente < maxLength and
+            not p0[-1] in snappedPoints):
+
             points.pop(i)
         else:
             i += 1
