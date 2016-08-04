@@ -1021,28 +1021,28 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
 
     outfile = swmmout.open(swmmOuputFileName)
 
-    query_vars = ['depth']
+    query_vars = ['head']
     query_nodes = ['NODO'+str(i) for i, nodo in enumerate(nodos)]
     data = outfile.get_values('nodes', query_nodes, query_vars)
-
-    for i, nodo in enumerate(nodos):
-        nodo.maxDepth = max([d[i+1][1] for d in data])
 
     # Conseguir la referencia geografica
     spatial_ref = leer_spatial_reference(shpFileNodos)
 
-    # Escribir shape con las profundidades maximas
-    campos = OrderedDict()
-    campos["depth"] = [nodo.maxDepth for nodo in nodos]
-    campos["elev"] = [nodo.maxDepth + nodo.offset + nodo.elev for nodo in nodos]
-    escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
-
-    # Escribir shape con las profundidades en cada paso de tiempo
+    # Escribir shape con los niveles y profundidades en cada paso de tiempo
     for i, dataline in enumerate(data):
         campos = OrderedDict()
-        campos["depth"] = [max(dataline[i+1][1], 0) for i, nodo in enumerate(nodos)]
-        campos["elev"] = [max(dataline[i+1][1], 0) + nodo.offset + nodo.elev for i, nodo in enumerate(nodos)]
+        campos["elev"]  = [dataline[i+1][1] for i, nodo in enumerate(nodos)]
+        campos["depth"] = [max(dataline[i+1][1] - (nodo.elev + nodo.offset), 0) for i, nodo in enumerate(nodos)]
         escribir_shp_puntos("nodeDepth%04d.shp" % i, [nodo.p for nodo in nodos], campos, spatial_ref)
+
+    for i, nodo in enumerate(nodos):
+        nodo.maxHead = max([dataline[i+1][1] for dataline in data])
+
+    # Escribir shape con los niveles y profundidades máximas
+    campos = OrderedDict()
+    campos["elev"]  = [nodo.maxHead for nodo in nodos]
+    campos["depth"] = [max(nodo.maxHead - (nodo.elev + nodo.offset), 0) for nodo in nodos]
+    escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
 
 def mainCalculateDeadDepths():
