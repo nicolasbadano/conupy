@@ -238,14 +238,16 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
             for targetStream in streams:
                 if (stream == targetStream):
                     continue
-                mindistSq, minj = pow(params["maxDistSnapStreamNodes"], 2), -1
+                mindist, minj = params["maxDistSnapStreamNodes"], -1
                 for (j, p2) in enumerate(targetStream.points):
-                    dSq = distSq(p, p2)
-                    if dSq < mindistSq:
-                        mindistSq, minj = dSq, j
+                    d = dist(p, p2)
+                    if d < mindist:
+                        mindist, minj = d, j
                 if minj == -1:
                     continue
-                snappedPoints.append(targetStream.points[minj])
+                # Convert coordinates to tuple because numpy arrays don't
+                # work properly with the "in" operand
+                snappedPoints.append(tuple(targetStream.points[minj]))
                 return targetStream.points[minj]
             return p
 
@@ -332,7 +334,6 @@ def mainReadStreets(shpFileCalles):
         if channel_data is not None:
             nch0, nch1, channel_link = channel_data
             p4 = intersection(nodos[n0].p, nodos[n1].p, nodos[nch0].p, nodos[nch1].p)
-            print n0, p4
 
             nchannel = nch0 if dist(nodos[nch0].p, p4) <= dist(nodos[nch1].p, p4) else nch1
 
@@ -449,7 +450,7 @@ def mainReadStreets(shpFileCalles):
     campos["w"] = []
     for (n0, n1) in links:
         link = links[(n0, n1)]
-        polilineas.append([nodos[n0], nodos[n1]])
+        polilineas.append([nodos[n0].p, nodos[n1].p])
         campos["n0"].append(int(n0))
         campos["n1"].append(int(n1))
         campos["type"].append(str(link["type"]))
@@ -542,12 +543,11 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
         if minj == -1:
             continue
 
-        nodoOutfall = Bunch(p = numpy.array(posicionesNodosOutfall[minj]),
+        nodoOutfall = Bunch(p = np.array(posicionesNodosOutfall[minj]),
                             elev = nodo.elev)
+        nodosOutfall.append(nodoOutfall)
 
         lineasOutfall.append( [i, len(nodosOutfall)-1, params["maxDistConnectOutfallNodes"]] )
-
-    print nodosOutfall, nodosOutfallElev, lineasOutfall
 
     saveOnFile(nodosOutfall, "nodosOutfall")
     saveOnFile(lineasOutfall, "lineasOutfall")
@@ -635,28 +635,26 @@ def mainCreateRainGagesMethod1(stationsFileName):
     with open(stationsFileName, "r") as f:
         for i, line in enumerate(f):
             data = line.split()
-            gage = {}
-            gage["coord"] = [float(data[0]), float(data[1])]
-            gage["name"] = data[2]
-            gage["file"] = data[3]
-            gage["interval"] = '0:05'
+            gage = Bunch()
+            gage.coord = np.array([float(data[0]), float(data[1])])
+            gage.name = data[2]
+            gage.file = data[3]
+            gage.interval = '0:05'
             gages.append(gage)
 
     print "Seleccionando pluviómetro para cada subcuenca..."
     subcatchmentGages = []
     centros = readFromFile('centros')
     for (i, centro) in enumerate(centros):
-        minDistSq = 1e10
-        minGage = None
+        minDist, minGage = 1e10, None
 
         for gage in gages:
-            gDistSq = distSq(gage["coord"], centro)
+            gDist = dist(gage.coord, np.array(centro[0:2]))
 
-            if gDistSq < minDistSq:
-                minGage = gage
-                minDistSq = gDistSq
+            if gDist < minDist:
+                minGage, minDist = gage, gDist
 
-        subcatchmentGages.append(minGage["name"])
+        subcatchmentGages.append(minGage.name)
 
     saveOnFile(gages, "gages")
     saveOnFile(subcatchmentGages, "subcatchmentGages")
@@ -730,7 +728,7 @@ def mainCreateSWMM(swmmInputFileName):
         n1 = centro[2]
         nodo = nodos[n1]
         gageName = subcatchmentGages[i]
-        list = ['CUENCA'+str(i), gageName, 'NODO'+str(n1), "%.3f" % (float(subcuencas[i][1])/10000.0), "%.3f" % nodo.imperv, "%.3f" % (nodo.length/2), "%.3f" % (nodo.slope), "%.3f" % (subcuencas[i][1]**0.5)]
+        list = ['CUENCA'+str(i), gageName, 'NODO'+str(n1), "%.3f" % (float(subcuencas[i][1])/10000.0), "%.3f" % nodo.imper, "%.3f" % (nodo.length/2), "%.3f" % (nodo.slope), "%.3f" % (subcuencas[i][1]**0.5)]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 

@@ -191,7 +191,7 @@ def escribir_shp_polilineas(fileName, polilineas, campos, spatial_reference):
         fet = QgsFeature()
         puntos = []
         for (j, punto) in enumerate(polilinea):
-            puntos.append(QgsPoint(punto[0], punto[1]))
+            puntos.append(QgsPoint(float(punto[0]), float(punto[1])))
 
         fet.setGeometry(QgsGeometry.fromPolyline(puntos))
         fet.setAttributes([campos[nombre][i] for nombre in campos])

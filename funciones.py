@@ -62,8 +62,9 @@ def insertPoints(points, maxLength = 50):
             i += 1
 
 
-def removePoints(points, maxLength = 25, snappedPoints):
+def removePoints(points, maxLength, snappedPoints):
     i = 1
+
     while (i<len(points)-1):
         p2 = points[i-1]
         p0 = points[i]
@@ -73,7 +74,7 @@ def removePoints(points, maxLength = 25, snappedPoints):
 
         if (lengthAnterior < maxLength and
             lengthSiguiente < maxLength and
-            not p0[-1] in snappedPoints):
+            not (tuple(p0) in snappedPoints)):
 
             points.pop(i)
         else:
@@ -108,7 +109,8 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
         # The geo_hash is empty, populate it
         for i, nodo in enumerate(nodos):
             ix, iy = [int(z/1000.0) for z in nodo.p]
-            geo_hash[(ix,iy)] = geo_hash.get((ix, iy), []).append(i)
+            geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
+            geo_hash[(ix,iy)].append(i)
 
     ix, iy = [int(z/1000.0) for z in punto]
     nodosCercanos = []
@@ -152,7 +154,8 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
     node = Bunch(p = np.array(punto),
                  type = tipo)
     nodos.append(node)
-    geo_hash[(ix,iy)] = geo_hash.get((ix, iy), []).append(len(nodos)-1)
+    geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
+    geo_hash[(ix,iy)].append(len(nodos)-1)
     return len(nodos)-1;
 
 
