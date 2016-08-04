@@ -4,6 +4,7 @@ import arcpy
 from arcpy import env
 from arcpy.sa import *
 import os
+import numpy as np
 
 default_spatial_reference = None
 
@@ -34,7 +35,7 @@ def leer_shp_puntos(shp_file, lista_campos = []):
             sFeat = sRow.getValue(shapeName)
 
             pnt = sFeat.getPart(0)
-            punto = [pnt.X, pnt.Y]
+            punto = np.array([pnt.X, pnt.Y])
             for campo in lista_campos:
                 punto.append( sRow.getValue(campo) )
 
@@ -77,7 +78,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
                 puntos = []
                 pnt = part.next()
                 while pnt:
-                    punto = [pnt.X, pnt.Y]
+                    punto = np.array([pnt.X, pnt.Y])
                     puntos.append(punto)
                     pnt = part.next()
 
@@ -125,7 +126,7 @@ def leer_shp_poligonos(shp_file, lista_campos = []):
                 puntos = []
                 pnt = part.next()
                 while pnt:
-                    punto = [pnt.X, pnt.Y]
+                    punto = np.array([pnt.X, pnt.Y])
                     puntos.append(punto)
                     pnt = part.next()
 

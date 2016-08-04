@@ -4,6 +4,7 @@ from qgis.core import *
 from PyQt4 import QtCore
 import os
 import processing
+import numpy as np
 
 default_spatial_reference = None
 arcpy = []
@@ -39,7 +40,7 @@ def leer_shp_puntos(shp_file, lista_campos = []):
     for feature in features:
         geom = feature.geometry()
         x = geom.asPoint()
-        punto = [x[0], x[1]]
+        punto = np.array([x[0], x[1]])
 
         # fetch attributes
         attrs = feature.attributes()
@@ -69,7 +70,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         poly = []
         puntos = []
         for p in x:
-            punto = [p[0], p[1]]
+            punto = np.array([x[0], x[1]])
             puntos.append(punto)
 
         if len(puntos) < 2:
@@ -110,7 +111,7 @@ def leer_shp_poligonos(shp_file, lista_campos = []):
             continue
 
         for p in x[0]:
-            punto = [p[0], p[1]]
+            punto = np.array([x[0], x[1]])
             puntos.append(punto)
 
         if len(puntos) < 2:
