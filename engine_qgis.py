@@ -70,7 +70,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         poly = []
         puntos = []
         for p in x:
-            punto = np.array([x[0], x[1]])
+            punto = np.array([p[0], p[1]])
             puntos.append(punto)
 
         if len(puntos) < 2:
@@ -111,7 +111,7 @@ def leer_shp_poligonos(shp_file, lista_campos = []):
             continue
 
         for p in x[0]:
-            punto = np.array([x[0], x[1]])
+            punto = np.array([p[0], p[1]])
             puntos.append(punto)
 
         if len(puntos) < 2:

@@ -4,6 +4,7 @@ engine = "qgis" #"arcgis10" | "qgis_standalone"
 
 import sys, os
 from collections import OrderedDict
+from bunch import Bunch
 
 if engine == "arcgis10":
     from engine_arcgis10 import *
@@ -121,6 +122,7 @@ params["traAltoCordon"] = 0.2
 # Numero de Gages
 numGages = 21
 
+
 def mainCleanWorkspace(workspace):
     print "Limpiando el directorio de trabajo..."
 
@@ -194,7 +196,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
 
     # Calculate length of each stream
     for stream in streams:
-        length = sum(dist(p0,p1) for p0, p1 in pairwise(stream[0]))
+        length = sum(dist(p0, p1) for p0, p1 in pairwise(stream[0]))
         stream.append(length)
 
     # Write the prepared drainage network
@@ -263,18 +265,20 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
         points, w, h, typ, levelIni, levelFin = stream[0], stream[1], stream[2], stream[3], stream[6], stream[7]
         tipoTramo = "conduit" if str(typ).lower() in ["entubado", "conducto", "conduit"] else "channel"
 
-        nodes = [addNode(nodos, p, tipoTramo, geo_hash) for p in points]
-        length = sum(dist(nodos[n0],nodos[n1]) for n0, n1 in pairwise(nodes))
+        nodesn = [addNode(nodos, p, tipoTramo, geo_hash) for p in points]
+        length = sum(dist(nodos[n0].p, nodos[n1].p) for n0, n1 in pairwise(nodesn))
         progFin = 0
-        for n0, n1 in pairwise(nodes):
+        for n0, n1 in pairwise(nodesn):
             progIni = progFin
-            progFin = progIni + dist(nodos[n0],nodos[n1])
+            progFin = progIni + dist(nodos[n0].p, nodos[n1].p)
             if n0 == n1:
                 continue
             # Create a new link
-            links[(n0, n1)] = {"type":tipoTramo, "w":w, "h":h,
-                               "levelIni":levelIni + (levelFin - levelIni) * progIni / length,
-                               "levelFin":levelIni + (levelFin - levelIni) * progFin / length}
+            links[(n0, n1)] = {"type": tipoTramo,
+                               "w": w,
+                               "h": h,
+                               "levelIni": levelIni + (levelFin - levelIni) * progIni / length,
+                               "levelFin": levelIni + (levelFin - levelIni) * progFin / length}
 
     print "\tNumber of nodes for the drainage network: %i" % len(nodos)
     print "\tNumber of links for the drainage network: %i" % len(links)
@@ -324,23 +328,23 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Verificar si la calle atraviesa un arroyo
-        channel_data = atraviesaArroyo(nodos[n0], nodos[n1], nodos, links)
+        channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, links)
 
         if channel_data is not None:
             nch0, nch1, channel_link = channel_data
-            p4 = intersection(nodos[n0], nodos[n1], nodos[nch0], nodos[nch1])
+            p4 = intersection(nodos[n0].p, nodos[n1].p, nodos[nch0].p, nodos[nch1].p)
             print n0, p4
 
-            nchannel = nch0 if dist(nodos[nch0], p4) <= dist(nodos[nch1], p4) else nch1
+            nchannel = nch0 if dist(nodos[nch0].p, p4) <= dist(nodos[nch1].p, p4) else nch1
 
             # Dividir primero el arroyo si vale la pena (distancia al nodo más
             # cercano > a 15% maxLengthForStreamSpanDivide)
-            if (min(dist(nodos[nch0], p4), dist(nodos[nch1], p4)) >
+            if (min(dist(nodos[nch0].p, p4), dist(nodos[nch1].p, p4)) >
                 params["maxLengthForStreamSpanDivide"] * 0.15):
 
                 nchannel = addNode(nodos, p4, "channel", geo_hash, 0)
 
-                alpha = dist(nodos[nch0], nodos[nchannel]) / dist(nodos[nch0], nodos[nch1])
+                alpha = dist(nodos[nch0].p, nodos[nchannel].p) / dist(nodos[nch0].p, nodos[nch1].p)
                 levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
 
                 links[(nch0, nchannel)] = {"type": channel_link["type"],
@@ -371,18 +375,18 @@ def mainReadStreets(shpFileCalles):
     print "Creando sumideros"
     tF.write("Creando sumideros\n")
     for (i, nodo) in enumerate(nodos):
-        if nodo[2] != "corner":
+        if nodo.type != "corner":
             continue
 
         # Buscar el nodo conducto mas cercano
         mindist, minj = params["maxDistGutter"], -1
         for (j, nodo2) in enumerate(nodos):
-            if nodo2[2] == "conduit":
-                d = dist(nodo, nodo2)
+            if nodo2.type == "conduit":
+                d = dist(nodo.p, nodo2.p)
                 if d < mindist:
                     mindist = d
                     minj = j
-            if nodo2[2] == "corner":
+            if nodo2.type == "corner":
                 break
         if minj == -1:
             continue
@@ -399,19 +403,18 @@ def mainReadStreets(shpFileCalles):
     print "Creando vertederos"
     tF.write("Creando vertederos\n")
     # Crear un array con todos los segmentos de canal
-    channels = [(np.array(nodos[n0][0:2]), np.array(nodos[n1][0:2]), n0, n1) for ((n0, n1), link) in links.iteritems() if link["type"] == "channel"]
+    channels = [(nodos[n0].p, nodos[n1].p, n0, n1) for ((n0, n1), link) in links.iteritems() if link["type"] == "channel"]
     for (i, nodo) in enumerate(nodos):
-        if nodo[2] != "corner":
+        if nodo.type != "corner":
             continue
 
-        p = np.array(nodo[0:2])
         # Buscar el tramo de arroyo mas cercano
         mindist, minj = params["maxDistWeir"], -1
         for p10, p11, n10, n11 in channels:
-            d = distToSegment(p, p10, p11)
+            d = distToSegment(nodo.p, p10, p11)
             if d < mindist:
                 mindist = d
-                minj = n10 if dist(p, p10) <= dist(p, p11) else n11
+                minj = n10 if dist(nodo.p, p10) <= dist(nodo.p, p11) else n11
 
         if minj == -1:
             continue
@@ -427,15 +430,15 @@ def mainReadStreets(shpFileCalles):
     # Crear centros de cuencas
     centros = []
     for (i, nodo) in enumerate(nodos):
-        if nodo[2] != "conduit":
-            centros.append([nodo[0], nodo[1], i])
+        if nodo.type != "conduit":
+            centros.append([nodo.p[0], nodo.p[1], i])
 
     print "Numero de nodos:   ", len(nodos)
     print "Numero de cuencas: ", len(centros)
     print "Numero de links:  ", len(links)
 
     # Escribir shape con la posicion de los nodos
-    escribir_shp_puntos(shpFileNodos, nodos, {}, spatial_ref)
+    escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], {}, spatial_ref)
     # Escribir shape con la posicion de los baricentros de subcuencas
     escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
     # Escribir shape con los links
@@ -505,13 +508,17 @@ def mainGetSubcatchments(shpFileCuenca):
 def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad):
     print "Proceso de muestreo de datos..."
 
+    nodos = readFromFile('nodos')
+
     nodosElev = sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
     nodosSlope = sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
     nodosImpermeabilidad = sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
+    for i, nodo in enumerate(nodos):
+        nodo.elev = nodosElev[i]
+        nodo.slope = nodosSlope[i]
+        nodo.imper = nodosImpermeabilidad[i]
 
-    saveOnFile(nodosElev, "nodosElev")
-    saveOnFile(nodosSlope, "nodosSlope")
-    saveOnFile(nodosImpermeabilidad, "nodosImpermeabilidad")
+    saveOnFile(nodos, "nodos")
     print "Finalizado proceso de generacion de muestreo"
 
 
@@ -521,10 +528,8 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
     posicionesNodosOutfall = leer_shp_puntos(shpFileNodosBorde)
 
     nodos = readFromFile('nodos')
-    nodosElev = readFromFile('nodosElev')
 
     nodosOutfall = []
-    nodosOutfallElev = []
     lineasOutfall = []
     print posicionesNodosOutfall
 
@@ -532,20 +537,20 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
         # Buscar la posicion outfall mas cercana
         mindist, minj = params["maxDistConnectOutfallNodes"], -1
         for (j, posNO) in enumerate(posicionesNodosOutfall):
-            if dist(nodo, posNO) < mindist:
-                mindisdt = dist(nodo, posNO)
+            if dist(nodo.p, posNO) < mindist:
+                mindisdt = dist(nodo.p, posNO)
                 minj = j
         if minj == -1:
             continue
 
-        nodosOutfall.append(list(posicionesNodosOutfall[minj]))
-        nodosOutfallElev.append(nodosElev[i])
+        nodoOutfall = Bunch(p = numpy.array(posicionesNodosOutfall[minj]),
+                            elev = nodo.elev)
+
         lineasOutfall.append( [i, len(nodosOutfall)-1, params["maxDistConnectOutfallNodes"]] )
 
     print nodosOutfall, nodosOutfallElev, lineasOutfall
 
     saveOnFile(nodosOutfall, "nodosOutfall")
-    saveOnFile(nodosOutfallElev, "nodosOutfallElev")
     saveOnFile(lineasOutfall, "lineasOutfall")
     print "Finalizado proceso de generacion de nodos outfall"
 
@@ -555,24 +560,26 @@ def mainCalculateInvertOffsets():
 
     nodos = readFromFile('nodos')
     links = readFromFile('links')
-    nodosElev = readFromFile('nodosElev')
 
-    nodosInvElevOffset = [0] * len(nodos)
-    for n0, n1 in links:
-        link = links[(n0, n1)]
+    for nodo in nodos:
+        nodo.offset = 0
+        nodo.length = 0
 
-        if link["type"] == "weir" or link["type"] == "gutter":
-            continue
+    for (n0, n1), link in links.iteritems():
+        # Acumulate the length of segments incoming to the node
+        if link["type"] in ["street", "channel"]:
+            length = dist(nodos[n0].p, nodos[n1].p)
+            nodos[n0].length += length
+            nodos[n1].length += length
 
-        offset0, offset1 = 0, 0
+        # Update invert offset if appropiate
         if link["type"] in ["conduit", "channel"]:
-            offset0 = link["levelIni"] - nodosElev[n0]
-            offset1 = link["levelFin"] - nodosElev[n1]
+            offset0 = link["levelIni"] - nodos[n0].elev
+            offset1 = link["levelFin"] - nodos[n1].elev
+            nodos[n0].offset = min(nodos[n0].offset, offset0)
+            nodos[n1].offset = min(nodos[n1].offset, offset1)
 
-        nodosInvElevOffset[n0] = min(nodosInvElevOffset[n0], offset0)
-        nodosInvElevOffset[n1] = min(nodosInvElevOffset[n1], offset1)
-    saveOnFile(nodosInvElevOffset, "nodosInvElevOffset")
-
+    saveOnFile(nodos, "nodos")
     print "Finalizado el calculo de inverts"
 
 
@@ -621,6 +628,7 @@ def mainCreateRainGagesMethod0(gageFileName, rasterFileCoeficiente, gagesFileNam
 
     print "Finalizado el procesamiento de pluviómetros"
 
+
 def mainCreateRainGagesMethod1(stationsFileName):
 
     print "Leyendo lista de pluviometros..."
@@ -665,29 +673,15 @@ def mainCreateSWMM(swmmInputFileName):
     links = readFromFile('links')
     subcuencas = readFromFile('subcuencas')
     nodosOutfall = readFromFile('nodosOutfall')
-    nodosOutfallElev = readFromFile('nodosOutfallElev')
     lineasOutfall = readFromFile('lineasOutfall')
-
-    nodosInvElevOffset = readFromFile('nodosInvElevOffset')
-
-    nodosElev = readFromFile('nodosElev')
-    nodosSlope = readFromFile('nodosSlope')
-    nodosImpermeabilidad = readFromFile('nodosImpermeabilidad')
 
     gages = readFromFile('gages')
     subcatchmentGages = readFromFile('subcatchmentGages')
 
-    nodosLongitudLineas = [0] * len(nodos)
-    for (n0, n1) in links:
-        link = links[(n0, n1)]
-        if link["type"] not in ["street", "channel"]:
-            continue
-        nodosLongitudLineas[n0] = nodosLongitudLineas[n0] + dist(nodos[n0], nodos[n1])
-        nodosLongitudLineas[n1] = nodosLongitudLineas[n1] + dist(nodos[n0], nodos[n1])
-
-    areasNodo = [1.167] * len(nodos)
+    for nodo in nodos:
+        nodo.area = 1.167
     for (i, centro) in enumerate(centros):
-        areasNodo[centro[2]] = params["juApondPer"] * subcuencas[i][1]
+        nodos[centro[2]].area = params["juApondPer"] * subcuencas[i][1]
 
     tF = open(swmmInputFileName, "w")
     tF.write("[TITLE]\n")
@@ -734,9 +728,10 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Raingage       Outlet         Area           %ImperV        Width          Slope          Curve Length\n")
     tF.write(";;======================================================================================================================\n")
     for (i, centro) in enumerate(centros):
-        numNodo = centro[2]
+        n1 = centro[2]
+        nodo = nodos[n1]
         gageName = subcatchmentGages[i]
-        list = ['CUENCA'+str(i), gageName, 'NODO'+str(numNodo), "%.3f" % (float(subcuencas[i][1])/10000.0), "%.3f" % nodosImpermeabilidad[numNodo], "%.3f" % (nodosLongitudLineas[numNodo]/2), "%.3f" % (nodosSlope[numNodo]), "%.3f" % (subcuencas[i][1]**0.5)]
+        list = ['CUENCA'+str(i), gageName, 'NODO'+str(n1), "%.3f" % (float(subcuencas[i][1])/10000.0), "%.3f" % nodo.imperv, "%.3f" % (nodo.length/2), "%.3f" % (nodo.slope), "%.3f" % (subcuencas[i][1]**0.5)]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -773,7 +768,7 @@ def mainCreateSWMM(swmmInputFileName):
     # for (i, centro) in enumerate(centros):
         # areasNodo[centro[2]] = params["juApondPer"] * subcuencas[i][1]
     # for (i, nodo) in enumerate(nodos):
-        # list = ['NODO'+str(i), nodosElev[i]+nodosInvElevOffset[i], juYmax-nodosInvElevOffset[i], params["juY0"], juYsur, "%.3f" % areasNodo[i]]
+        # list = ['NODO'+str(i), nodosElev[i]+nodo.offset, juYmax-nodo.offset, params["juY0"], juYsur, "%.3f" % nodo.area]
         # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         # tF.write("\n")
 
@@ -783,7 +778,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Elev           Ymax           Y0             TABULAR        Apond          ) \n")
     tF.write(";;========================================================================================\n")
     for (i, nodo) in enumerate(nodos):
-        list = ['NODO'+str(i), "%.3f" % (nodosElev[i]+nodosInvElevOffset[i]), "%.3f" % (-nodosInvElevOffset[i]+20), params["juY0"], 'TABULAR', 'STORAGE'+str(i), "%.3f" % (areasNodo[i])]
+        list = ['NODO'+str(i), "%.3f" % (nodo.elev + nodo.offset), "%.3f" % (-nodo.offset+20), params["juY0"], 'TABULAR', 'STORAGE'+str(i), "%.3f" % nodo.area]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -793,10 +788,10 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Type           x-value        y-value\n")
     tF.write(";;========================================================================================\n")
     for (i, nodo) in enumerate(nodos):
-        if (nodosInvElevOffset[i] < 0):
-            list = ['STORAGE'+str(i), 'STORAGE', 0, 1.167, -nodosInvElevOffset[i], 1.167, -nodosInvElevOffset[i]+1, "%.3f" % (areasNodo[i]/10),-nodosInvElevOffset[i]+2, "%.3f" % (areasNodo[i]),-nodosInvElevOffset[i]+20, "%.3f" % (areasNodo[i])]
+        if (nodo.offset < 0):
+            list = ['STORAGE'+str(i), 'STORAGE', 0, 1.167, -nodo.offset, 1.167, -nodo.offset+1, "%.3f" % (nodo.area/10), -nodo.offset+2, "%.3f" % nodo.area, -nodo.offset+20, "%.3f" % nodo.area]
         else:
-            list = ['STORAGE'+str(i), 'STORAGE', 0, 1.167, 1, "%.3f" % (areasNodo[i]/10), 2, "%.3f" % (areasNodo[i]), 20, "%.3f" % (areasNodo[i])]
+            list = ['STORAGE'+str(i), 'STORAGE', 0, 1.167, 1, "%.3f" % (nodo.area/10), 2, "%.3f" % nodo.area, 20, "%.3f" % nodo.area]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -806,7 +801,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Elev           Type           Gate\n")
     tF.write(";;==========================================================\n")
     for (i, nodo) in enumerate(nodosOutfall):
-        list = ['NODOOUT'+str(i), nodosOutfallElev[i], "FREE", "NO"]
+        list = ['NODOOUT'+str(i), nodo.elev, "FREE", "NO"]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -814,12 +809,11 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write("[CONDUITS]\n")
     tF.write(";;Name         Node1          Node2          Length         N              Z1             Z2             Q0\n")
     tF.write(";;======================================================================================================================\n")
-    for i, (in0, in1) in enumerate(links):
-        link = links[(in0, in1)]
+    for i, ((in0, in1), link) in enumerate(links.iteritems()):
         name = link["type"] + str(i)
-        length = dist(nodos[in0], nodos[in1])
+        length = dist(nodos[in0].p, nodos[in1].p)
         if link["type"] == "street":
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodosElev[in0], "%.3f" % nodosElev[in1], 0]
+            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodos[in0].elev, "%.3f" % nodos[in1].elev, 0]
         elif link["type"] in ["channel", "conduit"]:
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
         else:
@@ -829,8 +823,8 @@ def mainCreateSWMM(swmmInputFileName):
     for (i, linea) in enumerate(lineasOutfall):
         in0, in1, ancho = linea
         name = 'SALIDA' + str(i)
-        length = dist(nodos[in0], nodosOutfall[in1])
-        list = [name, 'NODO'+str(in0), 'NODOOUT'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % (nodosElev[in0]+nodosInvElevOffset[in0]), "%.3f" % (nodosElev[in0]+nodosInvElevOffset[in0]), 0]
+        length = dist(nodos[in0].p, nodosOutfall[in1].p)
+        list = [name, 'NODO'+str(in0), 'NODOOUT'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % (nodos[in0].elev+nodos[in0].offset), "%.3f" % (nodos[in0].elev+nodos[in0].offset), 0]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -839,12 +833,11 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write("[WEIRS]\n")
     tF.write(";;Name         Node1          Node2          Type           Offset         Cd             Flap  (EC Cd2)          \n")
     tF.write(";;======================================================================================================================\n")
-    for i, (in0, in1) in enumerate(links):
-        link = links[(in0, in1)]
+    for i, ((in0, in1), link) in enumerate(links.iteritems()):
         if link["type"] != "weir":
             continue
         name = "weir" + str(i)
-        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDEFLOW", "%.3f" % (nodosElev[in0]+params["weAlturaCordon"]), params["weCd"], "NO"]
+        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDEFLOW", "%.3f" % (nodos[in0].elev + params["weAlturaCordon"]), params["weCd"], "NO"]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -853,12 +846,11 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write("[ORIFICES]\n")
     tF.write(";;Name         Node1          Node2          Type           Offset         Cd             Flap           Orate\n")
     tF.write(";;======================================================================================================================\n")
-    for i, (in0, in1) in enumerate(links):
-        link = links[(in0, in1)]
+    for i, ((in0, in1), link) in enumerate(links.iteritems()):
         if link["type"] != "gutter":
             continue
         name = "gutter" + str(i)
-        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDE", 0, "%.3f" % (nodosElev[in0]-params["traAltoCordon"]), "NO", 0]
+        list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDE", 0, "%.3f" % (nodos[in0].elev - params["traAltoCordon"]), "NO", 0]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -868,8 +860,7 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Link         Type           G1             G2             G3             G4\n")
     tF.write(";;========================================================================================\n")
     transectas = {}
-    for i, (in0, in1) in enumerate(links):
-        link = links[(in0, in1)]
+    for i, ((in0, in1), link) in enumerate(links.iteritems()):
         name = link["type"] + str(i)
 
         if link["type"] == "street":
@@ -877,7 +868,7 @@ def mainCreateSWMM(swmmInputFileName):
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
         elif link["type"] == "channel":
-            tname = link["type"] + str(int(link["w"]))  + "x" + str(int(link["h"]))
+            tname = link["type"] + str(int(link["w"])) + "x" + str(int(link["h"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
         elif link["type"] == "conduit":
@@ -974,18 +965,11 @@ def mainCreateSWMM(swmmInputFileName):
 
     tF.write("\n\n\n\n")
     tF.write("[MAP]\n")
-    minx, miny, maxx, maxy = 1e9, 1e9, -1e9,-1e9
-    for n in nodos:
-        if (n[0] < minx):
-            minx = n[0]
-        if (n[0] > maxx):
-            maxx = n[0]
-        if (n[1] < miny):
-            miny = n[1]
-        if (n[1] > maxy):
-            maxy = n[1]
-    distx = maxx - minx;
-    disty = maxy - miny;
+    minx = min(nodo.p[0] for nodo in nodos)
+    maxx = max(nodo.p[0] for nodo in nodos)
+    miny = min(nodo.p[1] for nodo in nodos)
+    maxy = max(nodo.p[1] for nodo in nodos)
+    distx, disty = maxx - minx, maxy - miny
     tF.write(";;             minx           miny           maxx           maxy\n")
     tF.write(";;=========================================================================\n")
     list = ['DIMENSIONS', minx - 0.1 * distx, miny - 0.1 * disty, maxx + 0.1 * distx, maxy + 0.1 * disty]
@@ -997,11 +981,11 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Node         xcoord         ycoord         \n")
     tF.write(";;===========================================\n")
     for (i, nodo) in enumerate(nodos):
-        list = ['NODO'+str(i), nodo[0], nodo[1]]
+        list = ['NODO'+str(i), nodo.p[0], nodo.p[1]]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
     for (i, nodo) in enumerate(nodosOutfall):
-        list = ['NODOOUT'+str(i), nodo[0], nodo[1]]
+        list = ['NODOOUT'+str(i), nodo.p[0], nodo.p[1]]
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
@@ -1035,52 +1019,39 @@ def mainCreateSWMM(swmmInputFileName):
 
 def mainReadSWMMResultsDepths(swmmOuputFileName):
     nodos = readFromFile('nodos')
-    nodosElev = readFromFile('nodosElev')
-    nodosInvElevOffset = readFromFile('nodosInvElevOffset')
 
     print "Numero de nodos: ", len(nodos)
 
     outfile = swmmout.open(swmmOuputFileName)
 
     query_vars = ['depth']
-    query_nodes = []
-    for i in xrange(0,len(nodos)):
-        query_nodes.append( 'NODO'+str(i) )
+    query_nodes = ['NODO'+str(i) for i, nodo in enumerate(nodos)]
     data = outfile.get_values('nodes', query_nodes, query_vars)
 
-    nodeMaxDepths = []
-    for i in xrange(0,len(nodos)):
-        nodeMaxDepths.append(max([d[i+1][1] for d  in data]))
-        nodeMaxDepths[i] = nodeMaxDepths[i] + nodosInvElevOffset[i]
-        if (nodeMaxDepths[i] < 0):
-            nodeMaxDepths[i] = 0
+    for i, nodo in enumerate(nodos):
+        nodo.maxDepth = max([d[i+1][1] for d in data])
 
     # Conseguir la referencia geografica
     spatial_ref = leer_spatial_reference(shpFileNodos)
 
     # Escribir shape con las profundidades maximas
     campos = OrderedDict()
-    campos["depth"] = [maxDepth for maxDepth in nodeMaxDepths]
-    campos["elev"] = [maxDepth + nodosElev[j] for j, maxDepth in enumerate(nodeMaxDepths)]
-    escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", nodos, campos, spatial_ref)
+    campos["depth"] = [nodo.maxDepth for nodo in nodos]
+    campos["elev"] = [nodo.maxDepth + nodo.offset + nodo.elev for nodo in nodos]
+    escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
     # Escribir shape con las profundidades en cada paso de tiempo
     for i, dataline in enumerate(data):
         campos = OrderedDict()
-        campos["depth"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) for j in range(1,len(dataline))]
-        campos["elev"] = [max(dataline[j][1] + nodosInvElevOffset[j-1], 0) + nodosElev[j-1] for j in range(1,len(dataline))]
-        escribir_shp_puntos("nodeDepth%04d.shp" % i, nodos, campos, spatial_ref)
+        campos["depth"] = [max(dataline[i+1][1], 0) for i, nodo in enumerate(nodos)]
+        campos["elev"] = [max(dataline[i+1][1], 0) + nodo.offset + nodo.elev for i, nodo in enumerate(nodos)]
+        escribir_shp_puntos("nodeDepth%04d.shp" % i, [nodo.p for nodo in nodos], campos, spatial_ref)
 
 
 def mainCalculateDeadDepths():
     nodos = readFromFile('nodos')
-    nodosElev = readFromFile('nodosElev')
-    print len(nodos)
-    print len(nodosElev)
-    nodosInvElevOffset = readFromFile('nodosInvElevOffset')
     links = readFromFile('links')
     lineasOutfall = readFromFile('lineasOutfall')
-
 
     tirantes = [100 for nodo in nodos]
     print lineasOutfall
@@ -1093,15 +1064,15 @@ def mainCalculateDeadDepths():
             tirantes[nodo0] = 0
 
         def igualar(nodo0, nodo1):
-            elev0 = nodosElev[nodo0] + tirantes[nodo0]
-            elev1 = nodosElev[nodo1] + tirantes[nodo1]
+            elev0 = nodos[nodo0].elev + tirantes[nodo0]
+            elev1 = nodos[nodo1].elev + tirantes[nodo1]
             if elev0 <= elev1:
-                elev11 = max(nodosElev[nodo1], elev0)
-                tirantes[nodo1] = elev11 - nodosElev[nodo1]
+                elev11 = max(nodos[nodo1].elev, elev0)
+                tirantes[nodo1] = elev11 - nodos[nodo1].elev
                 bajada = elev1 - elev11
             else:
-                elev01 = max(nodosElev[nodo0], elev1)
-                tirantes[nodo0] = elev01 - nodosElev[nodo0]
+                elev01 = max(nodos[nodo0].elev, elev1)
+                tirantes[nodo0] = elev01 - nodos[nodo0].elev
                 bajada = elev0 - elev01
 
             return bajada
@@ -1119,9 +1090,9 @@ def mainCalculateDeadDepths():
     # Escribir shape con las profundidades maximas
     campos = {
                 "depth" : tirantes,
-                "nelev" : nodosElev
+                "nelev" : [nodo.elev for nodo in nodos]
              }
-    escribir_shp_puntos("nodesProfMuerta.shp", nodos, campos, spatial_ref)
+    escribir_shp_puntos("nodesProfMuerta.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
 
 

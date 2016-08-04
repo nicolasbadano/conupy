@@ -3,6 +3,7 @@ import math
 import pickle
 from itertools import tee, izip
 import numpy as np
+from bunch import Bunch
 
 def saveOnFile( data, name ):
     oF = open(name + ".pkl", 'wb')
@@ -18,7 +19,7 @@ def readFromFile( name ):
 
 
 def dist(p0, p1):
-    return ((p0[0]-p1[0])**2+(p0[1]-p1[1])**2)**0.5
+    return np.linalg.norm(p1 - p0)
 
 
 def distToSegment(p0, p10, p11):
@@ -38,11 +39,11 @@ def distToSegment(p0, p10, p11):
 
 
 def distSq(p0, p1):
-    return ((p0[0]-p1[0])**2+(p0[1]-p1[1])**2)
+    return np.linalg.norm(p1 - p0) ** 2
 
 
 def interpolate(p0, p1, alpha):
-    return [p0[0] + (p1[0]-p0[0])*alpha, p0[1] + (p1[1]-p0[1])*alpha]
+    return p0 * (1 - alpha) + p1 * alpha
 
 
 def insertPoints(points, maxLength = 50):
@@ -78,7 +79,7 @@ def removePoints(points, maxLength = 25):
 def atraviesaArroyo(p0, p1, nodos, links):
     for (n0, n1), link in links.iteritems():
         if link["type"] == "channel":
-            if (intersect(p0, p1, nodos[n0], nodos[n1])):
+            if (intersect(p0, p1, nodos[n0].p, nodos[n1].p)):
                 return n0, n1, link
 
     return None
@@ -102,22 +103,19 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
     if not any(geo_hash):
         # The geo_hash is empty, populate it
         for i, nodo in enumerate(nodos):
-            ix, iy = int(nodo[0]/1000.0), int(nodo[1]/1000.0)
-            geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
-            geo_hash[(ix,iy)].append(i)
+            ix, iy = [int(z/1000.0) for z in nodo.p]
+            geo_hash[(ix,iy)] = geo_hash.get((ix, iy), []).append(i)
 
-    ix, iy = int(punto[0]/1000.0), int(punto[1]/1000.0)
+    ix, iy = [int(z/1000.0) for z in punto]
     nodosCercanos = []
     for i in [-1, 0, 1]:
         for j in [-1, 0, 1]:
-            a = geo_hash.get((ix+i, iy+j), [])
-            nodosCercanos.extend(a)
-
+            nodosCercanos.extend(geo_hash.get((ix+i, iy+j), []))
 
     for i in nodosCercanos:
         nodo = nodos[i]
-        if distSq(nodo, punto) < tolSq:
-            if nodo[2] == "conduit":
+        if distSq(nodo.p, punto) < tolSq:
+            if nodo.type == "conduit":
                 # Si llega al menos un arroyo a un nodo conducto, pasa a ser nodo arroyo
                 if tipo == "channel":
                     nodos[i][2] = "channel"
@@ -128,7 +126,7 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
                 elif tipo == "corner":
                     continue
 
-            elif nodo[2] == "corner":
+            elif nodo.type == "corner":
                 if tipo == "channel":
                     #Esto no debería ocurrir, porque los arroyos se crean antes que las esquinas
                     return i
@@ -138,7 +136,7 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
                 elif tipo == "corner":
                     return i
 
-            elif nodo[2] == "channel":
+            elif nodo.type == "channel":
                 if tipo == "channel":
                     return i
                 elif tipo == "conduit":
@@ -147,10 +145,10 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
                     return i
 
     # Si no hay nodos cercanos, agregar uno
-    punto.append(tipo)
-    nodos.append(punto)
-    geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
-    geo_hash[(ix,iy)].append(len(nodos)-1)
+    node = Bunch(p = np.array(punto),
+                 type = tipo)
+    nodos.append(node)
+    geo_hash[(ix,iy)] = geo_hash.get((ix, iy), []).append(len(nodos)-1)
     return len(nodos)-1;
 
 
