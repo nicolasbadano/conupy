@@ -3,7 +3,7 @@ import math
 import pickle
 from itertools import tee, izip
 import numpy as np
-from bunch import Bunch
+from munch import Munch as Bunch
 
 def saveOnFile( data, name ):
     oF = open(name + ".pkl", 'wb')
@@ -54,7 +54,6 @@ def insertPoints(points, maxLength = 50):
         length = dist(p0, p1)
         if (length > maxLength):
             numSpans = int(math.floor(length / maxLength + 1))
-            newLength = length / numSpans
             for j in xrange(1,numSpans):
                 points.insert(i+j, interpolate(p0, p1, float(j)/float(numSpans)))
             i += numSpans

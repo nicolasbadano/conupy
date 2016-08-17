@@ -410,6 +410,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
 
     # Event handlers de btnActionArroyosCalles
     def btnActionArroyosCalles_click(self):
+        reload(conuPy)
         # Redireccionar stdout a la caja de texto
         sys.stdout = WriteStreamInmediate(self.textInfo)
 

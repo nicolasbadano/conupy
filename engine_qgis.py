@@ -1,6 +1,6 @@
 ﻿# GIS functions for QGIS 2.10.1
 
-from qgis.core import *
+import qgis.core
 from PyQt4 import QtCore
 import os
 import processing
@@ -11,12 +11,12 @@ arcpy = []
 
 def gis_init():
     # supply path to where is your qgis installed
-    app = QgsApplication([],True)
+    app = qgis.core.QgsApplication([],True)
     print app
-    print QgsApplication.setPrefixPath("C:/Program Files/QGIS Pisa", True)
+    print qgis.core.QgsApplication.setPrefixPath("C:/Program Files/QGIS Pisa", True)
 
     # load providers
-    print QgsApplication.initQgis()
+    print qgis.core.QgsApplication.initQgis()
 
 
 def crear_datos_temporales():
@@ -24,14 +24,14 @@ def crear_datos_temporales():
 
 
 def leer_spatial_reference(fileName):
-    layer = QgsVectorLayer(fileName, "capa1", "ogr")
+    layer = qgis.core.QgsVectorLayer(fileName, "capa1", "ogr")
     spatial_reference = layer.crs()
     print spatial_reference
     return spatial_reference
 
 
 def leer_shp_puntos(shp_file, lista_campos = []):
-    layer = QgsVectorLayer(shp_file, "capa1", "ogr")
+    layer = qgis.core.QgsVectorLayer(shp_file, "capa1", "ogr")
 
     resultados = []
     print "Leyendo shape de puntos ", shp_file
@@ -48,7 +48,7 @@ def leer_shp_puntos(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            poly.append(val if val else None)
+            qgis.core.poly.append(val if val else None)
 
         resultados.append(punto)
 
@@ -57,7 +57,7 @@ def leer_shp_puntos(shp_file, lista_campos = []):
 
 
 def leer_shp_polilineas(shp_file, lista_campos = []):
-    layer = QgsVectorLayer(shp_file, "capa1", "ogr")
+    layer = qgis.core.QgsVectorLayer(shp_file, "capa1", "ogr")
 
     resultados = []
     print "Leyendo shape de polilineas ", shp_file
@@ -93,7 +93,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
 
 
 def leer_shp_poligonos(shp_file, lista_campos = []):
-    layer = QgsVectorLayer(shp_file, "capa1", "ogr")
+    layer = qgis.core.QgsVectorLayer(shp_file, "capa1", "ogr")
 
     resultados = []
     print "Leyendo shape de poligonos ", shp_file
@@ -137,27 +137,27 @@ def escribir_shp_puntos(fileName, puntos, campos, spatial_reference):
     print "Escribiendo shape de puntos: " + fileName
     outPath, outFC = os.path.split(fileName)
 
-    fields = QgsFields()
+    fields = qgis.core.QgsFields()
     for nombre in campos:
         dato = campos[nombre][0]
-        type = ""
         if isinstance(dato, int):
-            fields.append(QgsField(nombre, QtCore.QVariant.Int))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.Int))
         elif isinstance(dato, float):
-            fields.append(QgsField(nombre, QtCore.QVariant.Double))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.Double))
         elif isinstance(dato, str):
-            fields.append(QgsField(nombre, QtCore.QVariant.String))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.String))
 
-    writer = QgsVectorFileWriter(fileName, "CP1250", fields, QGis.WKBPoint, spatial_reference, "ESRI Shapefile")
+    writer = qgis.core.QgsVectorFileWriter(fileName, "CP1250", fields,
+        qgis.core.QGis.WKBPoint, spatial_reference, "ESRI Shapefile")
 
-    if writer.hasError() != QgsVectorFileWriter.NoError:
+    if writer.hasError() != qgis.core.QgsVectorFileWriter.NoError:
         print "Error when creating shapefile: ",  writer.errorMessage()
 
     # Add features
     for (i, punto) in enumerate(puntos):
-        fet = QgsFeature()
+        fet = qgis.core.QgsFeature()
 
-        fet.setGeometry(QgsGeometry.fromPoint(QgsPoint(punto[0], punto[1])))
+        fet.setGeometry(qgis.core.QgsGeometry.fromPoint(qgis.core.QgsPoint(punto[0], punto[1])))
         fet.setAttributes([campos[nombre][i] for nombre in campos])
 
         writer.addFeature(fet)
@@ -170,30 +170,30 @@ def escribir_shp_puntos(fileName, puntos, campos, spatial_reference):
 def escribir_shp_polilineas(fileName, polilineas, campos, spatial_reference):
     print "Escribiendo shape de polilineas: " + fileName
 
-    fields = QgsFields()
+    fields = qgis.core.QgsFields()
     for nombre in campos:
         dato = campos[nombre][0]
-        type = ""
         if isinstance(dato, int):
-            fields.append(QgsField(nombre, QtCore.QVariant.Int))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.Int))
         elif isinstance(dato, float):
-            fields.append(QgsField(nombre, QtCore.QVariant.Double))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.Double))
         elif isinstance(dato, str):
-            fields.append(QgsField(nombre, QtCore.QVariant.String))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.String))
 
-    writer = QgsVectorFileWriter(fileName, "CP1250", fields, QGis.WKBLineString, spatial_reference, "ESRI Shapefile")
+    writer = qgis.core.QgsVectorFileWriter(fileName, "CP1250", fields,
+        qgis.core.QGis.WKBLineString, spatial_reference, "ESRI Shapefile")
 
-    if writer.hasError() != QgsVectorFileWriter.NoError:
+    if writer.hasError() != qgis.core.QgsVectorFileWriter.NoError:
         print "Error when creating shapefile: ",  writer.errorMessage()
 
     # Add features
     for (i, polilinea) in enumerate(polilineas):
-        fet = QgsFeature()
+        fet = qgis.core.QgsFeature()
         puntos = []
         for (j, punto) in enumerate(polilinea):
-            puntos.append(QgsPoint(float(punto[0]), float(punto[1])))
+            puntos.append(qgis.core.QgsPoint(float(punto[0]), float(punto[1])))
 
-        fet.setGeometry(QgsGeometry.fromPolyline(puntos))
+        fet.setGeometry(qgis.core.QgsGeometry.fromPolyline(puntos))
         fet.setAttributes([campos[nombre][i] for nombre in campos])
 
         writer.addFeature(fet)
@@ -206,30 +206,30 @@ def escribir_shp_polilineas(fileName, polilineas, campos, spatial_reference):
 def escribir_shp_poligonos(fileName, poligonos, campos, spatial_reference):
     print "Escribiendo shape de polígonos: " + fileName
 
-    fields = QgsFields()
+    fields = qgis.core.QgsFields()
     for nombre in campos:
         dato = campos[nombre][0]
-        type = ""
         if isinstance(dato, int):
-            fields.append(QgsField(nombre, QtCore.QVariant.Int))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.Int))
         elif isinstance(dato, float):
-            fields.append(QgsField(nombre, QtCore.QVariant.Double))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.Double))
         elif isinstance(dato, str):
-            fields.append(QgsField(nombre, QtCore.QVariant.String))
+            fields.append(qgis.core.QgsField(nombre, QtCore.QVariant.String))
 
-    writer = QgsVectorFileWriter(fileName, "CP1250", fields, QGis.WKBPolygon, spatial_reference, "ESRI Shapefile")
+    writer = qgis.core.QgsVectorFileWriter(fileName, "CP1250", fields,
+        qgis.core.QGis.WKBPolygon, spatial_reference, "ESRI Shapefile")
 
-    if writer.hasError() != QgsVectorFileWriter.NoError:
+    if writer.hasError() != qgis.core.QgsVectorFileWriter.NoError:
         print "Error when creating shapefile: ",  writer.errorMessage()
 
     # Add features
     for (i, polilinea) in enumerate(poligonos):
-        fet = QgsFeature()
+        fet = qgis.core.QgsFeature()
         puntos = []
         for (j, punto) in enumerate(polilinea):
-            puntos.append(QgsPoint(punto[0], punto[1]))
+            puntos.append(qgis.core.QgsPoint(punto[0], punto[1]))
 
-        fet.setGeometry(QgsGeometry.fromPolygon(puntos))
+        fet.setGeometry(qgis.core.QgsGeometry.fromPolygon(puntos))
         fet.setAttributes([campos[nombre][i] for nombre in campos])
 
         writer.addFeature(fet)
@@ -242,10 +242,8 @@ def escribir_shp_poligonos(fileName, poligonos, campos, spatial_reference):
 def sample_raster_on_nodes(nodesFile, rasterFile):
     print "Muestreando el raster:" + rasterFile
 
-    nodesLayer = QgsVectorLayer(nodesFile, "nodeLayer", "ogr")
-    rasterLayer = QgsRasterLayer(rasterFile, "rasterLayer")
-
-    bandcount = rasterLayer.bandCount()
+    nodesLayer = qgis.core.QgsVectorLayer(nodesFile, "nodeLayer", "ogr")
+    rasterLayer = qgis.core.QgsRasterLayer(rasterFile, "rasterLayer")
 
     values = []
     features = nodesLayer.getFeatures()
@@ -253,7 +251,7 @@ def sample_raster_on_nodes(nodesFile, rasterFile):
         geom = feature.geometry()
         point = geom.asPoint()
 
-        res = rasterLayer.dataProvider().identify(point, QgsRaster.IdentifyFormatValue)
+        res = rasterLayer.dataProvider().identify(point, qgis.core.QgsRaster.IdentifyFormatValue)
         if res.isValid():
             values.append(res.results().values()[0])
         else:
@@ -267,7 +265,7 @@ def sample_raster_on_nodes(nodesFile, rasterFile):
 def create_thiessen_polygons(nodesFile, fileName):
     print "Creando polígonos de Thiessen. Destino: " + fileName
 
-    pointLayer = QgsVectorLayer(nodesFile, "capa1", "ogr")
+    pointLayer = qgis.core.QgsVectorLayer(nodesFile, "capa1", "ogr")
     processing.runalg("qgis:voronoipolygons", pointLayer, 1, fileName)
 
     print "Finalizada creación de polígonos."
@@ -276,8 +274,8 @@ def create_thiessen_polygons(nodesFile, fileName):
 def clip_feature(originalFile, clipPolygonFile, fileName):
     print "Recortando feature. Destino: " + fileName
 
-    originalLayer = QgsVectorLayer(originalFile, "capa1", "ogr")
-    clipLayer = QgsVectorLayer(clipPolygonFile, "capa2", "ogr")
+    originalLayer = qgis.core.QgsVectorLayer(originalFile, "capa1", "ogr")
+    clipLayer = qgis.core.QgsVectorLayer(clipPolygonFile, "capa2", "ogr")
     processing.runalg("qgis:clip", originalLayer, clipLayer, fileName)
 
     print "Finalizado el recortado."
@@ -286,7 +284,7 @@ def clip_feature(originalFile, clipPolygonFile, fileName):
 def read_areas(polygonFile):
     print "Leyendo areas: " + polygonFile
 
-    layer = QgsVectorLayer(polygonFile, "capa1", "ogr")
+    layer = qgis.core.QgsVectorLayer(polygonFile, "capa1", "ogr")
 
     resultados = []
 

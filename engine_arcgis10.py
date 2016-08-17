@@ -1,8 +1,7 @@
 ﻿# GIS functions for ArcGis 10.1
 
 import arcpy
-from arcpy import env
-from arcpy.sa import *
+from arcpy.sa import Sample
 import os
 import numpy as np
 
@@ -66,6 +65,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         sCur = arcpy.SearchCursor( shp_file )
         sRow = sCur.next()
         pnt = arcpy.CreateObject("Point")
+
 
         while (sRow):
             sFeat = sRow.getValue(shapeName)
@@ -353,7 +353,7 @@ def sample_raster_on_nodes(nodesFile, rasterFile):
     for row in value_list:
         pairs[row[1]] = float(row[-1])
 
-    values = [pairs[i] for i in range(0, len(values))]
+    values = [pairs[index] for index in range(0, len(values))]
 
     print "Finalizado el muestreado de valores."
     return values

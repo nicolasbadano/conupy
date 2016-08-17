@@ -2,23 +2,17 @@
 
 engine = "qgis" #"arcgis10" | "qgis_standalone"
 
-import sys, os
+import os
 from collections import OrderedDict
-from bunch import Bunch
+from munch import Munch as Bunch
 
 if engine == "arcgis10":
-    from engine_arcgis10 import *
+    import engine_arcgis10 as gis
 elif engine == "qgis":
-    from engine_qgis import *
-elif engine == "qgis_standalone":
-    from engine_qgis import *
-    import inspect
-    print inspect.getfile(inspect.currentframe()) # script filename (usually with path)
-    print os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe()))) # script directory
-    print os.path.dirname(inspect.getfile(inspect.currentframe()))
-    sys.path.append(os.path.dirname(inspect.getfile(inspect.currentframe())))
+    import engine_qgis as gis
 
-from funciones import *
+from funciones import (dist, pairwise, insertPoints, removePoints, addNode,
+    saveOnFile, readFromFile, atraviesaArroyo, intersection, distToSegment)
 import swmmout
 import numpy as np
 
@@ -131,7 +125,7 @@ def mainCleanWorkspace(workspace):
     for f in file_list:
         try:
             os.remove(f)
-        except Exception, err:
+        except:
             print "\t" + f + " no pudo ser borrado."
 
     print "Finalizado el limpiado del directorio de trabajo."
@@ -141,18 +135,18 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
     print "STARTED: Drainage network preparation"
 
     # Read the original drainage network
-    streams = leer_shp_polilineas(shpFileDrainageOriginal, ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
-    spatial_ref = leer_spatial_reference(shpFileDrainageOriginal)
+    streams = gis.leer_shp_polilineas(shpFileDrainageOriginal, ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+    spatial_ref = gis.leer_spatial_reference(shpFileDrainageOriginal)
 
     # Write a shape file with the nodes of the network
     nodesDrainageNetwork = []
     for stream in streams:
         nodesDrainageNetwork.append(stream[0][0])
         nodesDrainageNetwork.append(stream[0][-1])
-    escribir_shp_puntos(shpFileNodesDrainageNetwork, nodesDrainageNetwork, {}, spatial_ref)
+    gis.escribir_shp_puntos(shpFileNodesDrainageNetwork, nodesDrainageNetwork, {}, spatial_ref)
 
     # Sample the terrain on the nodes
-    nodesTerrainLevels = sample_raster_on_nodes(shpFileNodesDrainageNetwork, rasterFileDEM)
+    nodesTerrainLevels = gis.sample_raster_on_nodes(shpFileNodesDrainageNetwork, rasterFileDEM)
 
     # Prepare the drainage network elevations base on available data for each node
     inode = 0
@@ -210,7 +204,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared,
     fields["levelIni"] = [stream[6] for stream in streams]
     fields["levelFin"] = [stream[7] for stream in streams]
     fields["slope"]    = [(stream[6] - stream[7]) / stream[8] for stream in streams]
-    escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
+    gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
 
     print "FINISHED: Drainage network preparation"
 
@@ -219,7 +213,7 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
     print "STARTED: Drainage network construction"
 
     # Read the prepared drainage network
-    streams = leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+    streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
     streams = [Bunch(points = stream[0],
                      w = stream[1],
                      h = stream[2],
@@ -296,8 +290,8 @@ def mainReadStreets(shpFileCalles):
     tF = open("log", "w")
     tF.write("Proceso de creado de calles\n")
 
-    spatial_ref = leer_spatial_reference(shpFileCalles)
-    calles = leer_shp_polilineas(shpFileCalles, ['ANCHO'])
+    spatial_ref = gis.leer_spatial_reference(shpFileCalles)
+    calles = gis.leer_shp_polilineas(shpFileCalles, ['ANCHO'])
 
     # Crear nodos esquina y lineas calle
     nodos = readFromFile('nodosArroyo')
@@ -403,7 +397,10 @@ def mainReadStreets(shpFileCalles):
     print "Creando vertederos"
     tF.write("Creando vertederos\n")
     # Crear un array con todos los segmentos de canal
-    channels = [(nodos[n0].p, nodos[n1].p, n0, n1) for ((n0, n1), link) in links.iteritems() if link["type"] == "channel"]
+    channels = [(nodos[nn0].p, nodos[nn1].p, nn0, nn1)
+        for ((nn0, nn1), link) in links.iteritems()
+        if link["type"] == "channel"]
+
     for (i, nodo) in enumerate(nodos):
         if nodo.type != "corner":
             continue
@@ -438,9 +435,9 @@ def mainReadStreets(shpFileCalles):
     print "Numero de links:  ", len(links)
 
     # Escribir shape con la posicion de los nodos
-    escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], {}, spatial_ref)
+    gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], {}, spatial_ref)
     # Escribir shape con la posicion de los baricentros de subcuencas
-    escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
+    gis.escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
     # Escribir shape con los links
     polilineas = []
     campos = OrderedDict()
@@ -455,7 +452,7 @@ def mainReadStreets(shpFileCalles):
         campos["n1"].append(int(n1))
         campos["type"].append(str(link["type"]))
         campos["w"].append(float(link.get("w", -1.0)))
-    escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
+    gis.escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
 
     # Write list files
     saveOnFile(nodos, "nodos")
@@ -470,21 +467,20 @@ def mainReadStreets(shpFileCalles):
 def mainGetSubcatchments(shpFileCuenca):
     print "Proceso de creado de cuencas"
 
-    create_thiessen_polygons(shpFileCentros, subcuencasShpFile)
+    gis.create_thiessen_polygons(shpFileCentros, subcuencasShpFile)
 
-    clip_feature(subcuencasShpFile, shpFileCuenca, subcuencasClipShpFile)
+    gis.clip_feature(subcuencasShpFile, shpFileCuenca, subcuencasClipShpFile)
 
     print "Finalizado proceso de creado de cuencas"
 
     subcuencas = []
     if engine == "arcgis10":
-        calculate_areas(subcuencasClipShpFile, subcuencasAreaShpFile)
-        subcuencas = leer_shp_poligonos(subcuencasAreaShpFile, ["Input_FID", "F_AREA"])
-
+        gis.calculate_areas(subcuencasClipShpFile, subcuencasAreaShpFile)
+        subcuencas = gis.leer_shp_poligonos(subcuencasAreaShpFile, ["Input_FID", "F_AREA"])
 
     elif engine == "qgis":
-        areas = read_areas(subcuencasClipShpFile)
-        subcuencas = leer_shp_poligonos(subcuencasClipShpFile, ["FID"])
+        areas = gis.read_areas(subcuencasClipShpFile)
+        subcuencas = gis.leer_shp_poligonos(subcuencasClipShpFile, ["FID"])
 
         for i, subcuenca in enumerate(subcuencas):
             subcuenca.append(areas[i])
@@ -510,9 +506,9 @@ def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad
 
     nodos = readFromFile('nodos')
 
-    nodosElev = sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
-    nodosSlope = sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
-    nodosImpermeabilidad = sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
+    nodosElev = gis.sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
+    nodosSlope = gis.sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
+    nodosImpermeabilidad = gis.sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
     for i, nodo in enumerate(nodos):
         nodo.elev = nodosElev[i]
         nodo.slope = nodosSlope[i]
@@ -525,7 +521,7 @@ def mainSampleNodeData(rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad
 def mainCreateOutfallNodes(shpFileNodosBorde):
     print "Proceso de generacion de nodos outfall..."
 
-    posicionesNodosOutfall = leer_shp_puntos(shpFileNodosBorde)
+    posicionesNodosOutfall = gis.leer_shp_puntos(shpFileNodosBorde)
 
     nodos = readFromFile('nodos')
 
@@ -538,7 +534,7 @@ def mainCreateOutfallNodes(shpFileNodosBorde):
         mindist, minj = params["maxDistConnectOutfallNodes"], -1
         for (j, posNO) in enumerate(posicionesNodosOutfall):
             if dist(nodo.p, posNO) < mindist:
-                mindisdt = dist(nodo.p, posNO)
+                mindist = dist(nodo.p, posNO)
                 minj = j
         if minj == -1:
             continue
@@ -612,7 +608,7 @@ def mainCreateRainGagesMethod0(gageFileName, rasterFileCoeficiente, gagesFileNam
             tF.write("\n")
 
     print "Leyendo mapa de decaimiento"
-    nodosDecaimiento = sample_raster_on_nodes(shpFileNodos, rasterFileCoeficiente)
+    nodosDecaimiento = gis.sample_raster_on_nodes(shpFileNodos, rasterFileCoeficiente)
 
     print "Seleccionando pluviómetro para cada subcuenca"
     subcatchmentGages = []
@@ -1026,14 +1022,14 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     data = outfile.get_values('nodes', query_nodes, query_vars)
 
     # Conseguir la referencia geografica
-    spatial_ref = leer_spatial_reference(shpFileNodos)
+    spatial_ref = gis.leer_spatial_reference(shpFileNodos)
 
     # Escribir shape con los niveles y profundidades en cada paso de tiempo
     for i, dataline in enumerate(data):
         campos = OrderedDict()
         campos["elev"]  = [dataline[i+1][1] for i, nodo in enumerate(nodos)]
         campos["depth"] = [max(dataline[i+1][1] - (nodo.elev + nodo.offset), 0) for i, nodo in enumerate(nodos)]
-        escribir_shp_puntos("nodeDepth%04d.shp" % i, [nodo.p for nodo in nodos], campos, spatial_ref)
+        gis.escribir_shp_puntos("nodeDepth%04d.shp" % i, [nodo.p for nodo in nodos], campos, spatial_ref)
 
     for i, nodo in enumerate(nodos):
         nodo.maxHead = max([dataline[i+1][1] for dataline in data])
@@ -1042,7 +1038,7 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     campos = OrderedDict()
     campos["elev"]  = [nodo.maxHead for nodo in nodos]
     campos["depth"] = [max(nodo.maxHead - (nodo.elev + nodo.offset), 0) for nodo in nodos]
-    escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
+    gis.escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
 
 def mainCalculateDeadDepths():
@@ -1082,26 +1078,23 @@ def mainCalculateDeadDepths():
         print "Iteracion %i - Max Bajada %f" % (i, maxbajada)
 
     # Conseguir la referencia geografica
-    spatial_ref = leer_spatial_reference(shpFileNodos)
+    spatial_ref = gis.leer_spatial_reference(shpFileNodos)
 
     # Escribir shape con las profundidades maximas
     campos = {
                 "depth" : tirantes,
                 "nelev" : [nodo.elev for nodo in nodos]
              }
-    escribir_shp_puntos("nodesProfMuerta.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
+    gis.escribir_shp_puntos("nodesProfMuerta.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
 
 
 
 
-if __name__ == '__console__' :
-    os.chdir(workspace)
-    mainReadRivers()
 
 if __name__ == '__main__':
     os.chdir(workspace)
-    gis_init()
+    gis.gis_init()
 
     # Opciones de corrida
     print "Que desea hacer?"
@@ -1115,13 +1108,12 @@ if __name__ == '__main__':
     print " 7 - Generar archivos de SWMM"
     print " 8 - Todo"
     print " 9 - Leer resultados y escribir shp con profundidad y elevacion en nodos"
-    print "11 - Crear pluviometros"
-    print "12 - Analisis de tirantes muertos"
+    print "11 - Analisis de tirantes muertos"
     x = input("Opcion:")
     if (x == 0):
         mainPrepareDrainageNetwork(defaultShpFileDrainageOriginal, defaultShpFileDrainagePrepared, defaultRasterFileDEM)
     elif (x == 1):
-        mainReadRivers(defaultShpFileDrainagePrepared)
+        mainReadDrainageNetwork(defaultShpFileDrainagePrepared)
     elif (x == 2):
         mainReadStreets(defaultShpFileCalles)
     elif (x == 3):
@@ -1135,7 +1127,7 @@ if __name__ == '__main__':
     elif (x == 7):
         mainCreateSWMM(defaultSwmmInputFileName)
     elif (x == 8):
-        mainReadRivers(defaultShpFileArroyos)
+        mainReadDrainageNetwork(defaultShpFileDrainagePrepared)
         mainReadStreets(defaultShpFileCalles)
         mainGetSubcatchments(defaultShpFileCuenca)
         mainSampleNodeData(defaultRasterFileDEM, defaultRasterFileSlope, defaultRasterFileCoeficiente, defaultRasterFileImpermeabilidad)
@@ -1144,8 +1136,6 @@ if __name__ == '__main__':
         mainCreateSWMM(defaultSwmmInputFileName)
     elif (x == 9):
         mainReadSWMMResultsDepths(defaultSwmmOuputFileName)
-    elif (x == 11):
-        mainCreateGenerateRain(defaultGageFileName, defaultGagesFileName)
     elif (x == 12):
         mainCalculateDeadDepths()
 
