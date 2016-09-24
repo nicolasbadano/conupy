@@ -298,6 +298,7 @@ def mainReadStreets(shpFileCalles):
     nodos = readFromFile('nodosArroyo')
     links = readFromFile('linksArroyo')
 
+    stream_links = {(n0, n1): link for (n0, n1), link in links.iteritems() if link["type"] == "channel"}
     geo_hash = {}
     for (i,calle) in enumerate(calles):
         if i % 100 == 0:
@@ -324,7 +325,7 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Verificar si la calle atraviesa un arroyo
-        channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, links)
+        channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, stream_links)
 
         if channel_data is not None:
             nch0, nch1, channel_link = channel_data
@@ -353,6 +354,7 @@ def mainReadStreets(shpFileCalles):
                                            "levelIni": levelMid,
                                            "levelFin": channel_link["levelFin"]}
                 del links[(nch0, nch1)]
+                stream_links = {(n0, n1): link for (n0, n1), link in links.iteritems() if link["type"] == "channel"}
 
             # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
             if n0 != nchannel:

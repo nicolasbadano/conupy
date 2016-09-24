@@ -103,15 +103,16 @@ def intersect(A,B,C,D):
     return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
 
 
-def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
+def addNode(nodos, punto, tipo, geo_hash, tolerance = 5):
     if not any(geo_hash):
+        print "\tInit geo_hash"
         # The geo_hash is empty, populate it
         for i, nodo in enumerate(nodos):
-            ix, iy = [int(z/1000.0) for z in nodo.p]
+            ix, iy = [int(z/100.0) for z in nodo.p]
             geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
             geo_hash[(ix,iy)].append(i)
 
-    ix, iy = [int(z/1000.0) for z in punto]
+    ix, iy = [int(z/100.0) for z in punto]
     nodosCercanos = []
     for i in [-1, 0, 1]:
         for j in [-1, 0, 1]:
@@ -119,7 +120,7 @@ def addNode(nodos, punto, tipo, geo_hash, tolSq = 30):
 
     for i in nodosCercanos:
         nodo = nodos[i]
-        if distSq(nodo.p, punto) < tolSq:
+        if dist(nodo.p, punto) < tolerance:
             if nodo.type == "conduit":
                 # Si llega al menos un arroyo a un nodo conducto, pasa a ser nodo arroyo
                 if tipo == "channel":
