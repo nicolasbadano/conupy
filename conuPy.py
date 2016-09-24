@@ -230,7 +230,8 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
     for stream in streams:
         def snap(p, stream, streams):
             for targetStream in streams:
-                if (stream == targetStream):
+                # Doing stream == targetStream triggers problems when comparing numpy arrays
+                if (stream.__dict__ == targetStream.__dict__):
                     continue
                 mindist, minj = params["maxDistSnapStreamNodes"], -1
                 for (j, p2) in enumerate(targetStream.points):
