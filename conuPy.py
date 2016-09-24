@@ -425,7 +425,7 @@ def mainReadStreets(shpFileCalles):
         if (n0, n1) in links or (n1, n0) in links:
             continue
         # Crear un vertedero
-        links[(n0, n1)] = {"type":"weir", "w":ancho}
+        links[(n0, n1)] = {"type":"weir", "w":params["xsVertederoW"]}
 
     # Crear centros de cuencas
     centros = []
