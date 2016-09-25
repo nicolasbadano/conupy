@@ -454,7 +454,10 @@ def mainReadStreets(shpFileCalles):
         campos["n0"].append(int(n0))
         campos["n1"].append(int(n1))
         campos["type"].append(str(link["type"]))
-        campos["w"].append(float(link.get("w", -1.0)))
+        try:
+            campos["w"].append(float(link.get("w", -1.0)))
+        except:
+            print "Error: link=", link
     gis.escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
 
     # Write list files

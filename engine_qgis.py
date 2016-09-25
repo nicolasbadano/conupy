@@ -48,7 +48,7 @@ def leer_shp_puntos(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            qgis.core.poly.append(val if val else None)
+            qgis.core.poly.append(val if val is not None else None)
 
         resultados.append(punto)
 
@@ -84,7 +84,7 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            poly.append(val if val else None)
+            poly.append(val if val is not None else None)
 
         resultados.append(poly)
 
@@ -125,7 +125,7 @@ def leer_shp_poligonos(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            poly.append(val if val else None)
+            poly.append(val if val is not None else None)
 
         resultados.append(poly)
 
