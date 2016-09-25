@@ -13,6 +13,9 @@ elif engine == "qgis":
 
 from funciones import (dist, pairwise, insertPoints, removePoints, addNode,
     saveOnFile, readFromFile, atraviesaArroyo, intersection, distToSegment)
+from nodesList import NodesList
+from linksDict import LinksDict
+from timing import Timing
 import swmmout
 import numpy as np
 
@@ -255,13 +258,12 @@ def mainReadDrainageNetwork(shpFileDrainagePrepared):
         removePoints(stream.points, params["minLengthForStreamSpanJoin"], snappedPoints)
 
     # Create nodes and links for the drainage network
-    nodos = []
-    links = OrderedDict()
-    geo_hash = {}
+    nodos = NodesList()
+    links = LinksDict(nodos)
     for stream in streams:
         tipoTramo = "conduit" if stream.typ in ["entubado", "conducto", "conduit"] else "channel"
 
-        nodesn = [addNode(nodos, p, tipoTramo, geo_hash) for p in stream.points]
+        nodesn = [addNode(nodos, p, tipoTramo) for p in stream.points]
         length = sum(dist(nodos[n0].p, nodos[n1].p) for n0, n1 in pairwise(nodesn))
         progFin = 0
         for n0, n1 in pairwise(nodesn):
@@ -297,15 +299,17 @@ def mainReadStreets(shpFileCalles):
     # Crear nodos esquina y lineas calle
     nodos = readFromFile('nodosArroyo')
     links = readFromFile('linksArroyo')
+    links.nodes = nodos
 
-    stream_links = {(n0, n1): link for (n0, n1), link in links.iteritems() if link["type"] == "channel"}
-    geo_hash = {}
+    timing = Timing()
+
     for (i,calle) in enumerate(calles):
         if i % 100 == 0:
             print "Procesando calle " + str(i) + " de " + str(len(calles))
             tF.write("Procesando calle " + str(i) + " de " + str(len(calles)) + "\n")
 
         puntos, ancho = calle[0], calle[1]
+
         # Si el ancho es nulo
         if (ancho == 0):
             continue
@@ -317,15 +321,18 @@ def mainReadStreets(shpFileCalles):
             continue
 
         # Crear u obtener los nodos extremos
-        n0 = addNode(nodos, puntos[0], "corner", geo_hash)
-        n1 = addNode(nodos, puntos[-1], "corner", geo_hash)
+        with timing.getTimer("addNode"):
+            n0 = addNode(nodos, puntos[0], "corner")
+        with timing.getTimer("addNode"):
+            n1 = addNode(nodos, puntos[-1], "corner")
 
         # Si la polilinea es demasiado corta
         if n0 == n1:
             continue
 
         # Verificar si la calle atraviesa un arroyo
-        channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, stream_links)
+        with timing.getTimer("atraviesaArroyo"):
+            channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, links)
 
         if channel_data is not None:
             nch0, nch1, channel_link = channel_data
@@ -338,7 +345,8 @@ def mainReadStreets(shpFileCalles):
             if (min(dist(nodos[nch0].p, p4), dist(nodos[nch1].p, p4)) >
                 params["maxLengthForStreamSpanDivide"] * 0.15):
 
-                nchannel = addNode(nodos, p4, "channel", geo_hash, 0)
+                with timing.getTimer("addNode"):
+                    nchannel = addNode(nodos, p4, "channel", 0)
 
                 alpha = dist(nodos[nch0].p, nodos[nchannel].p) / dist(nodos[nch0].p, nodos[nch1].p)
                 levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
@@ -354,7 +362,6 @@ def mainReadStreets(shpFileCalles):
                                            "levelIni": levelMid,
                                            "levelFin": channel_link["levelFin"]}
                 del links[(nch0, nch1)]
-                stream_links = {(n0, n1): link for (n0, n1), link in links.iteritems() if link["type"] == "channel"}
 
             # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
             if n0 != nchannel:
@@ -375,57 +382,60 @@ def mainReadStreets(shpFileCalles):
         if nodo.type != "corner":
             continue
 
-        # Buscar el nodo conducto mas cercano
-        mindist, minj = params["maxDistGutter"], -1
-        for (j, nodo2) in enumerate(nodos):
-            if nodo2.type == "conduit":
-                d = dist(nodo.p, nodo2.p)
-                if d < mindist:
-                    mindist = d
-                    minj = j
-            if nodo2.type == "corner":
-                break
-        if minj == -1:
-            continue
-        # Existe un nodo conducto cerca (< 80m)
-        n0, n1 = i, minj
-        # Si ya existe una conexión entre los nodos
-        if (n0, n1) in links or (n1, n0) in links:
-            continue
-        # Crear un sumidero
-        links[(n0, n1)] = {"type":"gutter"}
+        with timing.getTimer("crearSumidero"):
+            # Buscar el nodo conducto mas cercano
+            nearINodes = nodos.getINodesNear(nodo.p, params["maxDistGutter"])
+            mindist, minj = params["maxDistGutter"], -1
+            for j in nearINodes:
+                nodo2 = nodos[j]
+                if nodo2.type == "conduit":
+                    d = dist(nodo.p, nodo2.p)
+                    if d < mindist:
+                        mindist = d
+                        minj = j
+                if nodo2.type == "corner":
+                    break
+            if minj == -1:
+                continue
+            # Existe un nodo conducto cerca (< 80m)
+            n0, n1 = i, minj
+            # Si ya existe una conexión entre los nodos
+            if (n0, n1) in links or (n1, n0) in links:
+                continue
+            # Crear un sumidero
+            links[(n0, n1)] = {"type":"gutter", "w":params["xsSumideroW"]}
 
 
     # Crear vertederos
     print "Creando vertederos"
     tF.write("Creando vertederos\n")
-    # Crear un array con todos los segmentos de canal
-    channels = [(nodos[nn0].p, nodos[nn1].p, nn0, nn1)
-        for ((nn0, nn1), link) in links.iteritems()
-        if link["type"] == "channel"]
-
     for (i, nodo) in enumerate(nodos):
         if nodo.type != "corner":
             continue
 
-        # Buscar el tramo de arroyo mas cercano
-        mindist, minj = params["maxDistWeir"], -1
-        for p10, p11, n10, n11 in channels:
-            d = distToSegment(nodo.p, p10, p11)
-            if d < mindist:
-                mindist = d
-                minj = n10 if dist(nodo.p, p10) <= dist(nodo.p, p11) else n11
+        with timing.getTimer("crearVertedero"):
+            # Buscar el tramo de arroyo mas cercano
+            nearLinks = links.getLinksNear(nodo.p, params["maxDistWeir"])
+            mindist, minj = params["maxDistWeir"], -1
+            for n10, n11 in nearLinks.keys():
+                p10, p11 = nodos[n10].p, nodos[n11].p
+                d = distToSegment(nodo.p, p10, p11)
+                if d < mindist:
+                    mindist = d
+                    minj = n10 if dist(nodo.p, p10) <= dist(nodo.p, p11) else n11
 
-        if minj == -1:
-            continue
+            if minj == -1:
+                continue
 
-        # Existe un nodo arroyo cerca, conectar
-        n0, n1 = i, minj
-        # Si ya existe una conexión entre los nodos
-        if (n0, n1) in links or (n1, n0) in links:
-            continue
-        # Crear un vertedero
-        links[(n0, n1)] = {"type":"weir", "w":params["xsVertederoW"]}
+            # Existe un nodo arroyo cerca, conectar
+            n0, n1 = i, minj
+            # Si ya existe una conexión entre los nodos
+            if (n0, n1) in links or (n1, n0) in links:
+                continue
+            # Crear un vertedero
+            links[(n0, n1)] = {"type":"weir", "w":params["xsVertederoW"]}
+
+    timing.dump()
 
     # Crear centros de cuencas
     centros = []

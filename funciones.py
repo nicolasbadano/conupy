@@ -1,4 +1,4 @@
-﻿# GIS functions for ArcGis 10.1
+# funciones.py encoding: utf-8
 import math
 import pickle
 from itertools import tee, izip
@@ -81,7 +81,7 @@ def removePoints(points, maxLength, snappedPoints):
 
 
 def atraviesaArroyo(p0, p1, nodos, links):
-    for (n0, n1), link in links.iteritems():
+    for (n0, n1), link in links.getLinksInside(p0, p1).iteritems():
         if link["type"] == "channel":
             if (intersect(p0, p1, nodos[n0].p, nodos[n1].p)):
                 return n0, n1, link
@@ -103,22 +103,8 @@ def intersect(A,B,C,D):
     return ccw(A,C,D) != ccw(B,C,D) and ccw(A,B,C) != ccw(A,B,D)
 
 
-def addNode(nodos, punto, tipo, geo_hash, tolerance = 5):
-    if not any(geo_hash):
-        print "\tInit geo_hash"
-        # The geo_hash is empty, populate it
-        for i, nodo in enumerate(nodos):
-            ix, iy = [int(z/100.0) for z in nodo.p]
-            geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
-            geo_hash[(ix,iy)].append(i)
-
-    ix, iy = [int(z/100.0) for z in punto]
-    nodosCercanos = []
-    for i in [-1, 0, 1]:
-        for j in [-1, 0, 1]:
-            nodosCercanos.extend(geo_hash.get((ix+i, iy+j), []))
-
-    for i in nodosCercanos:
+def addNode(nodos, punto, tipo, tolerance = 5):
+    for i in nodos.getINodesNear(punto, tolerance):
         nodo = nodos[i]
         if dist(nodo.p, punto) < tolerance:
             if nodo.type == "conduit":
@@ -154,8 +140,6 @@ def addNode(nodos, punto, tipo, geo_hash, tolerance = 5):
     node = Bunch(p = np.array(punto),
                  type = tipo)
     nodos.append(node)
-    geo_hash[(ix,iy)] = geo_hash.get((ix, iy), [])
-    geo_hash[(ix,iy)].append(len(nodos)-1)
     return len(nodos)-1;
 
 
