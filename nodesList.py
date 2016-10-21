@@ -1,6 +1,7 @@
 # nodesList.py encoding: utf-8
 from collections import MutableSequence
 import numpy as np
+from funciones import dist
 
 class NodesList(MutableSequence):
 
@@ -60,3 +61,16 @@ class NodesList(MutableSequence):
 
     def getINodesNear(self, p0, distance):
         return self.getINodesInside(np.add(p0, -distance), np.add(p0, distance))
+
+    def getINode(self, p0):
+        inodes = self.getINodesInside(p0, p0)
+        mindist, minj = 0.5, -1
+        for j in inodes:
+            nodo2 = self.list[j]
+            d = dist(p0, nodo2.p)
+            if d < mindist:
+                mindist = d
+                minj = j
+        if minj == -1:
+            return None
+        return minj
