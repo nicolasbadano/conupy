@@ -319,3 +319,41 @@ def get_extent(shp_file):
             extent.xMaximum(),
             extent.yMinimum(),
             extent.yMaximum())
+
+def read_points_inside_features(shp_file_points, shp_file_polygons, lista_campos = []):
+    layer = qgis.core.QgsVectorLayer(shp_file_points, "capa1", "ogr")
+    layer_polygons = qgis.core.QgsVectorLayer(shp_file_polygons, "capa1", "ogr")
+
+    resultados = []
+    print "Leyendo shape de puntos ", shp_file_points
+
+    features = layer.getFeatures()
+    for feature in features:
+        geom = feature.geometry()
+        x = geom.asPoint()
+        punto = np.array([x[0], x[1]])
+
+        for polyfeature in layer_polygons.getFeatures():
+            if polyfeature.geometry().contains(x):
+                # fetch attributes
+                attrs = feature.attributes()
+                # attrs is a list. It contains all the attribute values of this feature
+                for campo in lista_campos:
+                    idx = layer.fieldNameIndex(campo)
+                    val = attrs[idx] if idx != -1 else None
+                    qgis.core.poly.append(val if val is not None else None)
+
+                resultados.append(punto)
+
+    print "Finalizado de leer shape de puntos."
+    return resultados
+
+def mark_points_inside_features(puntos, shp_file_polygons):
+    layer_polygons = qgis.core.QgsVectorLayer(shp_file_polygons, "capa1", "ogr")
+
+    for punto in puntos:
+        p = qgis.core.QgsPoint(punto.p[0], punto.p[1])
+        punto.inside = False
+        for polyfeature in layer_polygons.getFeatures():
+            if polyfeature.geometry().contains(p):
+                punto.inside = True
