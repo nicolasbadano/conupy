@@ -448,7 +448,9 @@ def mainReadStreets(shpFileCalles):
     print "Numero de links:  ", len(links)
 
     # Escribir shape con la posicion de los nodos
-    gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], {}, spatial_ref)
+    campos = OrderedDict()
+    campos["type"] = [nodo.type for nodo in nodos]
+    gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], campos, spatial_ref)
     # Escribir shape con la posicion de los baricentros de subcuencas
     gis.escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
     # Escribir shape con los links
