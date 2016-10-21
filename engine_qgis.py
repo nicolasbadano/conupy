@@ -311,3 +311,11 @@ def calculate_areas(polygonFile, fileName):
 
     finally:
         print "Finalizado el cálculo de areas."
+
+def get_extent(shp_file):
+    layer = qgis.core.QgsVectorLayer(shp_file, "capa1", "ogr")
+    extent = layer.extent()
+    return (extent.xMinimum(),
+            extent.xMaximum(),
+            extent.yMinimum(),
+            extent.yMaximum())
