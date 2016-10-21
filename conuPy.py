@@ -12,7 +12,8 @@ elif engine == "qgis":
     import engine_qgis as gis
 
 from funciones import (dist, pairwise, insertPoints, removePoints, addNode,
-    saveOnFile, readFromFile, atraviesaArroyo, intersection, distToSegment)
+    saveOnFile, readFromFile, atraviesaArroyo, intersection, distToSegment,
+    intersect)
 from nodesList import NodesList
 from linksDict import LinksDict
 from timing import Timing
@@ -115,6 +116,10 @@ params["traNCalle"] = 0.04
 params["traAnchoMargenArroyo"] = 20
 params["traAnchoVereda"] = 2
 params["traAltoCordon"] = 0.2
+
+# 2d zones parameters
+params["cellSize2D"] = 10
+params["maxDist2DConnection"] = 1.5 * params["cellSize2D"]
 
 # Numero de Gages
 numGages = 21
@@ -435,13 +440,17 @@ def mainReadStreets(shpFileCalles):
             # Crear un vertedero
             links[(n0, n1)] = {"type":"weir", "w":params["xsVertederoW"]}
 
-    timing.dump()
-
     # Crear centros de cuencas
     centros = []
     for (i, nodo) in enumerate(nodos):
         if nodo.type != "conduit":
             centros.append([nodo.p[0], nodo.p[1], i])
+
+    # with timing.getTimer("generate2D"):
+    #     generate2dZones(nodos, links, "F:/Trabajo/Dropbox/Federico/ConuPy_version_27-4-2016/Ejemplo/Zona2D/zona2D.shp")
+
+    timing.dump()
+
 
     print "Numero de nodos:   ", len(nodos)
     print "Numero de cuencas: ", len(centros)
@@ -480,6 +489,90 @@ def mainReadStreets(shpFileCalles):
     print "Finalizado proceso de creado de calles"
     tF.write("Finalizado proceso de creado de calles\n")
     tF.close()
+
+
+def generate2dZones(nodos, links, shpFile2dZones):
+    minX, maxX, minY, maxY = [int(x) for x in gis.get_extent(shpFile2dZones)]
+    junctions = []
+    for x in range(minX, maxX, params["cellSize2D"]):
+        for y in range(minY, maxY, params["cellSize2D"]):
+            junctions.append(Bunch(p = np.array([x, y]), inside = False))
+    gis.mark_points_inside_features(junctions, "F:/Trabajo/Dropbox/Federico/ConuPy_version_27-4-2016/Ejemplo/Zona2D/zona2D.shp")
+
+    for junction in junctions:
+        if junction.inside:
+            addNode(nodos, junction.p, "2d")
+
+    def atraviesaLinksTipo(p0, p1, tipos, nodos, links):
+        for (n0, n1), link in links.getLinksInside(p0, p1).iteritems():
+            if link["type"] in tipos:
+                if (intersect(p0, p1, nodos[n0].p, nodos[n1].p)):
+                    return True
+        return False
+
+    # Create 2D connections
+    for y in range(minY, maxY, params["cellSize2D"]):
+        for x0, x1 in pairwise(range(minX, maxX, params["cellSize2D"])):
+            in0 = nodos.getINode(np.array([float(x0),float(y)]))
+            in1 = nodos.getINode(np.array([float(x1),float(y)]))
+            if in0 is None or in1 is None:
+                continue
+            if (in0, in1) in links or (in1, in0) in links:
+                continue
+            if atraviesaLinksTipo(nodos[in0].p,
+                                    nodos[in1].p,
+                                    ["channel", "street"],
+                                    nodos,
+                                    links):
+                continue
+            links[(in0, in1)] = {"type":"2d", "w":params["cellSize2D"]}
+
+    for x in range(minX, maxX, params["cellSize2D"]):
+        for y0, y1 in pairwise(range(minY, maxY, params["cellSize2D"])):
+            in0 = nodos.getINode(np.array([float(x),float(y0)]))
+            in1 = nodos.getINode(np.array([float(x),float(y1)]))
+            if in0 is None or in1 is None:
+                continue
+            if (in0, in1) in links or (in1, in0) in links:
+                continue
+            if atraviesaLinksTipo(nodos[in0].p,
+                                    nodos[in1].p,
+                                    ["channel", "street"],
+                                    nodos,
+                                    links):
+                continue
+            links[(in0, in1)] = {"type":"2d", "w":params["cellSize2D"]}
+
+    for (i, nodo) in enumerate(nodos):
+        if nodo.type != "2d":
+            continue
+
+        # Buscar el nodo esquina o calle más cercano
+        nearINodes = nodos.getINodesNear(nodo.p, params["maxDist2DConnection"])
+        mindist, minj = params["maxDist2DConnection"], -1
+        for j in nearINodes:
+            nodo2 = nodos[j]
+            if nodo2.type in ["corner", "channel"]:
+                d = dist(nodo.p, nodo2.p)
+                if d < mindist:
+                    mindist = d
+                    minj = j
+        if minj == -1:
+            continue
+        # Existe un nodo conducto cerca (< 80m)
+        n0, n1 = i, minj
+        # Si ya existe una conexión entre los nodos
+        if (n0, n1) in links or (n1, n0) in links:
+            continue
+
+        if atraviesaLinksTipo(nodo.p + 0.1 * (nodos[minj].p - nodo.p),
+                              nodo.p + 0.9 * (nodos[minj].p - nodo.p),
+                              ["channel", "street", "2d"],
+                              nodos,
+                              links):
+            continue
+        # Crear un sumidero
+        links[(n0, n1)] = {"type":"2d", "w":params["cellSize2D"]}
 
 
 def mainGetSubcatchments(shpFileCuenca):
@@ -580,7 +673,7 @@ def mainCalculateInvertOffsets():
 
     for (n0, n1), link in links.iteritems():
         # Acumulate the length of segments incoming to the node
-        if link["type"] in ["street", "channel"]:
+        if link["type"] in ["street", "channel", "2d"]:
             length = dist(nodos[n0].p, nodos[n1].p)
             nodos[n0].length += length
             nodos[n1].length += length
@@ -770,18 +863,22 @@ def mainCreateSWMM(swmmInputFileName):
     # maximum additional head above ground elevation that manhole junction can sustain under surcharge conditions (ft or m) (default is 0).
     # juYsur = 0
     # % del area de la subcuenca en que se almacena el agua en el nodo
-    # params["juApondPer"] = 0.75
-    # tF.write("\n")
-    # tF.write("[JUNCTIONS]\n")
-    # tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
-    # tF.write(";;========================================================================================\n")
-    # areasNodo = [75.54] * len(nodos)
-    # for (i, centro) in enumerate(centros):
-        # areasNodo[centro[2]] = params["juApondPer"] * subcuencas[i][1]
-    # for (i, nodo) in enumerate(nodos):
-        # list = ['NODO'+str(i), nodosElev[i]+nodo.offset, juYmax-nodo.offset, params["juY0"], juYsur, "%.3f" % nodo.area]
-        # tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
-        # tF.write("\n")
+    params["juApondPer"] = 0.75
+    tF.write("\n")
+    tF.write("[JUNCTIONS]\n")
+    tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
+    tF.write(";;========================================================================================\n")
+    for (i, nodo) in enumerate(nodos):
+        if nodo.type != "2d":
+            continue
+        list = ['NODO'+str(i),
+                "%.3f" % (nodo.elev + nodo.offset),
+                "%.3f" % (-nodo.offset+20),
+                params["juY0"],
+                "%.3f" % 0,
+                "%.3f" % nodo.area]
+        tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
+        tF.write("\n")
 
 
     tF.write("\n")
@@ -789,8 +886,16 @@ def mainCreateSWMM(swmmInputFileName):
     tF.write(";;Name         Elev           Ymax           Y0             TABULAR        Apond          ) \n")
     tF.write(";;========================================================================================\n")
     for (i, nodo) in enumerate(nodos):
-        list = ['NODO'+str(i), "%.3f" % (nodo.elev + nodo.offset), "%.3f" % (-nodo.offset+20), params["juY0"], 'TABULAR', 'STORAGE'+str(i), "%.3f" % nodo.area]
-        tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
+        if nodo.type == "2d":
+            continue
+        tF.write(("").join([ str(x).ljust(15, ' ') for x in [
+            'NODO'+str(i),
+            "%.3f" % (nodo.elev + nodo.offset),
+            "%.3f" % (-nodo.offset+20),
+            params["juY0"],
+            'TABULAR',
+            'STORAGE'+str(i),
+            "%.3f" % nodo.area]]))
         tF.write("\n")
 
 
@@ -824,6 +929,8 @@ def mainCreateSWMM(swmmInputFileName):
         name = link["type"] + str(i)
         length = dist(nodos[in0].p, nodos[in1].p)
         if link["type"] == "street":
+            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodos[in0].elev, "%.3f" % nodos[in1].elev, 0]
+        elif link["type"] == "2d":
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodos[in0].elev, "%.3f" % nodos[in1].elev, 0]
         elif link["type"] in ["channel", "conduit"]:
             list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
@@ -878,6 +985,8 @@ def mainCreateSWMM(swmmInputFileName):
             tname = link["type"] + str(int(link["w"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
             list = [name, 'IRREGULAR', tname, 0, 0, 0]
+        elif link["type"] == "2d":
+            list = [name, 'RECT_OPEN', 100, 20.0, 2, 0, 1]
         elif link["type"] == "channel":
             tname = link["type"] + str(int(link["w"])) + "x" + str(int(link["h"]))
             transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]

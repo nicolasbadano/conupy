@@ -127,6 +127,8 @@ def addNode(nodos, punto, tipo, tolerance = 5):
                     continue
                 elif tipo == "corner":
                     return i
+                elif tipo == "2d":
+                    return i
 
             elif nodo.type == "channel":
                 if tipo == "channel":
@@ -134,6 +136,8 @@ def addNode(nodos, punto, tipo, tolerance = 5):
                 elif tipo == "conduit":
                     return i
                 elif tipo == "corner":
+                    return i
+                elif tipo == "2d":
                     return i
 
     # Si no hay nodos cercanos, agregar uno
