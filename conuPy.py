@@ -21,6 +21,7 @@ from timing import timing
 
 # Output fles
 shpFileNodesDrainageNetwork = "nodesDrainageNetwork.shp"
+shpFileNodosSample          = "nodosSample.shp"
 shpFileNodos                = "nodos.shp"
 shpFileCentros              = "centros.shp"
 shpFileLineas               = "lineas.shp"
@@ -79,6 +80,8 @@ params["coN"] = 0.04
 # Weirs parameters
 params["weAlturaCordon"] = 0.05
 params["weCd"] = 3.0
+# Orifice parameters
+params["orCd"] = 0.65
 # XSection parameters
 params["xsG1"], params["xsG3"], params["xsG4"] = 10, 0, 0
 params["xsSumideroH"], params["xsSumideroW"] = 0.15, 2.0
@@ -211,15 +214,14 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     # Create gutters and weirs
     createGutters(nodos, links)
     createWeirs(nodos, links)
-
     # Read 2d zones and create nodes and links
     # generate2dZones(nodos, links, "F:/Trabajo/Dropbox/Federico/ConuPy_version_27-4-2016/Ejemplo/Zona2D/zona2D.shp")
+    # Calculate elevations
+    calculateElevations(nodos, links, shpFileNodosSample, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad, spatial_ref)
 
     # Write the network
     writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref)
 
-    # Calculate elevations
-    calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad)
     # Create subcatchments
     centros, subcuencas = createSubcatchments(nodos, shpFileCuenca, spatial_ref)
     # Create outfalls
@@ -543,44 +545,17 @@ def generate2dZones(nodos, links, shpFile2dZones):
         links[(n0, n1)] = {"type":"2d", "w":params["cellSize2D"]}
 
 
-def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
-    print "Numero de nodos:\t%d" % len(nodos)
-    print "Numero de links:\t%d" % len(links)
-
-    # Escribir shape con la posicion de los nodos
-    campos = OrderedDict()
-    campos["type"] = [nodo.type for nodo in nodos]
-    gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], campos, spatial_ref)
-    # Escribir shape con los links
-    polilineas = []
-    campos = OrderedDict()
-    campos["n0"] = []
-    campos["n1"] = []
-    campos["type"]  = []
-    campos["w"] = []
-    for (n0, n1) in links:
-        link = links[(n0, n1)]
-        polilineas.append([nodos[n0].p, nodos[n1].p])
-        campos["n0"].append(int(n0))
-        campos["n1"].append(int(n1))
-        campos["type"].append(str(link["type"]))
-        try:
-            campos["w"].append(float(link.get("w", -1.0)))
-        except:
-            print "Error: link=", link
-    gis.escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
-
-
-def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad):
+def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad, spatial_ref):
     print "Proceso de calculo de elevaciones"
 
+    gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], {}, spatial_ref)
     nodosElev = gis.sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
     nodosSlope = gis.sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
-    nodosImpermeabilidad = gis.sample_raster_on_nodes(shpFileNodos, rasterFileImpermeabilidad)
+    nodosImpermeabilidad = gis.sample_raster_on_nodes(shpFileNodosSample, rasterFileImpermeabilidad)
     for i, nodo in enumerate(nodos):
-        nodo.elev = nodosElev[i]
-        nodo.slope = nodosSlope[i]
-        nodo.imper = nodosImpermeabilidad[i]
+        nodo.elev = float(nodosElev[i])
+        nodo.slope = float(nodosSlope[i])
+        nodo.imper = float(nodosImpermeabilidad[i])
         nodo.offset = 0
         nodo.length = 0
 
@@ -597,7 +572,56 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
             offset1 = link["levelFin"] - nodos[n1].elev
             nodos[n0].offset = min(nodos[n0].offset, offset0)
             nodos[n1].offset = min(nodos[n1].offset, offset1)
+
+    # Set elevations for streets, gutters and weirs
+    for (n0, n1), link in links.iteritems():
+        if link["type"] == "street":
+            link["levelIni"] = nodos[n0].elev
+            link["levelFin"] = nodos[n1].elev
+        elif link["type"] in ["weir", "orifice"]:
+            link["levelIni"] = nodos[n0].elev
+            link["levelFin"] = nodos[n1].elev + nodos[n1].offset
+
+            if link["type"] in "weir":
+                if link["levelFin"] > link["levelIni"]:
+                    print "WARNING: Weir %s - channel node invert is higher than the weir crest. This creates instabilties in SWMM."
+
     print "Finalizado el calculo de elevaciones"
+
+
+def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
+    print "Numero de nodos:\t%d" % len(nodos)
+    print "Numero de links:\t%d" % len(links)
+
+    # Escribir shape con la posicion de los nodos
+    campos = OrderedDict()
+    campos["type"] = [nodo.type for nodo in nodos]
+    campos["elev"] = [float(nodo.elev) for nodo in nodos]
+    campos["offs"] = [float(nodo.offset) for nodo in nodos]
+    campos["inve"] = [float(nodo.elev + nodo.offset) for nodo in nodos]
+    gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], campos, spatial_ref)
+    # Escribir shape con los links
+    polilineas = []
+    campos = OrderedDict()
+    campos["n0"] = []
+    campos["n1"] = []
+    campos["type"]  = []
+    campos["w"] = []
+    campos["elev0"] = []
+    campos["elev1"] = []
+    for (n0, n1) in links:
+        link = links[(n0, n1)]
+        polilineas.append([nodos[n0].p, nodos[n1].p])
+        campos["n0"].append(int(n0))
+        campos["n1"].append(int(n1))
+        campos["type"].append(str(link["type"]))
+        try:
+            campos["w"].append(float(link.get("w", -1.0)))
+            campos["elev0"].append(float(link["levelIni"]))
+            campos["elev1"].append(float(link["levelFin"]))
+        except:
+            print "Error: link=", link
+    gis.escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
 
 
 def createSubcatchments(nodos, shpFileCuenca, spatial_ref):
@@ -952,8 +976,8 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 'NODOOUT'+str(in1),
                 "%.3f" % length,
                 "%.3f" % params["coN"],
-                "%.3f" % (nodos[in0].elev+nodos[in0].offset),
-                "%.3f" % (nodos[in0].elev+nodos[in0].offset),
+                "%.3f" % nodos[in0].elev,
+                "%.3f" % nodos[in0].elev,
                 0]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
@@ -961,13 +985,23 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
 
         tF.write("\n")
         tF.write("[WEIRS]\n")
-        tF.write(";;Name         Node1          Node2          Type           Offset         Cd             Flap  (EC Cd2)          \n")
-        tF.write(";;======================================================================================================================\n")
+        tF.write(";;Name           From Node        To Node          Type         CrestHt    Qcoeff     Gated    EndCon   EndCoeff   Surcharge \n")
+        tF.write(";;-------------- ---------------- ---------------- ------------ ---------- ---------- -------- -------- ---------- ----------\n")
         for i, ((in0, in1), link) in enumerate(links.iteritems()):
             if link["type"] != "weir":
                 continue
             name = "weir" + str(i)
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDEFLOW", "%.3f" % (nodos[in0].elev + params["weAlturaCordon"]), params["weCd"], "NO"]
+            list = [
+                name,
+                'NODO'+str(in0),
+                'NODO'+str(in1),
+                "SIDEFLOW",
+                "%.3f" % (nodos[in0].elev + params["weAlturaCordon"]),
+                params["weCd"],
+                "NO",
+                0,
+                0,
+                "NO"]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
@@ -980,7 +1014,15 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
             if link["type"] != "gutter":
                 continue
             name = "gutter" + str(i)
-            list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "SIDE", 0, "%.3f" % (nodos[in0].elev - params["traAltoCordon"]), "NO", 0]
+            list = [
+                name,
+                'NODO'+str(in0),
+                'NODO'+str(in1),
+                "SIDE",
+                "%.3f" % nodos[in0].elev,
+                params["weCd"],
+                "NO",
+                0]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
