@@ -168,7 +168,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
         else:
             depthFin = nodesTerrainLevels[inode+1] - levelFin
 
-        stream[3], stream[4], stream[5], stream[6], stream[7] = typ, depthIni, depthFin, levelIni, levelFin
+        stream[3], stream[4], stream[5], stream[6], stream[7] = typ, float(depthIni), float(depthFin), float(levelIni), float(levelFin)
         inode += 2
 
     # Calculate length of each stream
@@ -186,7 +186,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     fields["depthFin"] = [stream[5] for stream in streams]
     fields["levelIni"] = [stream[6] for stream in streams]
     fields["levelFin"] = [stream[7] for stream in streams]
-    fields["slope"]    = [(stream[6] - stream[7]) / stream[8] for stream in streams]
+    fields["slope"]    = [float((stream[6] - stream[7]) / stream[8]) for stream in streams]
     gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
 
     print "FINISHED: Drainage network preparation"
@@ -246,11 +246,11 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     # Read the prepared drainage network
     streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
     streams = [Bunch(points = stream[0],
-                     w = stream[1],
-                     h = stream[2],
+                     w = float(stream[1]),
+                     h = float(stream[2]),
                      typ = str(stream[3]).lower(),
-                     levelIni = stream[6],
-                     levelFin = stream[7]) for stream in streams]
+                     levelIni = float(stream[6]),
+                     levelFin = float(stream[7])) for stream in streams]
 
     # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide
     for stream in streams:
@@ -313,7 +313,7 @@ def readStreets(nodos, links, shpFileCalles):
 
     streets = gis.leer_shp_polilineas(shpFileCalles, ['ANCHO'])
     streets = [Bunch(points = street[0],
-                     w = street[1]) for street in streets]
+                     w = float(street[1])) for street in streets]
 
     for street in streets:
         if len(street.points) < 2:

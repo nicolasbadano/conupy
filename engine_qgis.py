@@ -48,7 +48,9 @@ def leer_shp_puntos(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            qgis.core.poly.append(val if val is not None else None)
+            if isinstance(val, QtCore.QPyNullVariant):
+                val = None
+            qgis.core.poly.append(val)
 
         resultados.append(punto)
 
@@ -84,7 +86,9 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            poly.append(val if val is not None else None)
+            if isinstance(val, QtCore.QPyNullVariant):
+                val = None
+            poly.append(val)
 
         resultados.append(poly)
 
@@ -125,7 +129,9 @@ def leer_shp_poligonos(shp_file, lista_campos = []):
         for campo in lista_campos:
             idx = layer.fieldNameIndex(campo)
             val = attrs[idx] if idx != -1 else None
-            poly.append(val if val is not None else None)
+            if isinstance(val, QtCore.QPyNullVariant):
+                val = None
+            poly.append(val)
 
         resultados.append(poly)
 
@@ -253,7 +259,7 @@ def sample_raster_on_nodes(nodesFile, rasterFile):
 
         res = rasterLayer.dataProvider().identify(point, qgis.core.QgsRaster.IdentifyFormatValue)
         if res.isValid():
-            values.append(res.results().values()[0])
+            values.append(float(res.results().values()[0]))
         else:
             values.append(None)
 
