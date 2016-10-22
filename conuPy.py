@@ -397,8 +397,6 @@ def createGutters(nodos, links):
                     if d < mindist:
                         mindist = d
                         minj = j
-                if nodo2.type == "corner":
-                    break
             if minj == -1:
                 continue
             # Existe un nodo conducto cerca (< 80m)
