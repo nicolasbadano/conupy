@@ -33,19 +33,24 @@ subcuencasAreaShpFile       = "subcuencasArea.shp"
 # Parameters
 params = {}
 # Max dist for which channel and stream nodes are snapped together
-params["maxDistSnapStreamNodes"] = 50.0
+params["maxDistSnapStreamNodes"] = 20.0
+params["targetDx"] = 50.0
 # Max length stream spans can have without been subdivided
-params["maxLengthForStreamSpanDivide"] = 100.0
+params["maxLengthForStreamSpanDivide"] = params["targetDx"] * 4.0/3
 # Min length stream spans can have without been joined
-params["minLengthForStreamSpanJoin"] = 75.0
+params["minLengthForStreamSpanJoin"] = params["targetDx"] * 2.0/3
+# Max length street spans can have without been subdivided
+params["maxLengthForStreetSpanDivide"] = params["targetDx"] * 4.0/3
+# Min length street spans can have without been joined
+params["minLengthForStreetSpanJoin"] = params["targetDx"] * 2.0/3
 # Default coverage for conduits when no depths or levels were defined
 params["minCoverage"] = 0.3
 # Max distance required for gutters to be created from a corner to a conduit node
-params["maxDistGutter"] = 80.0
+params["maxDistGutter"] = params["targetDx"] * 1.1
 # Max distance required for weirs to be created from a corner to a channel segment
-params["maxDistWeir"] = 20.0
+params["maxDistWeir"] = params["targetDx"] * 0.5
 # Max dist for which outfall nodes are connected to regular nodes
-params["maxDistConnectOutfallNodes"] = 50.0
+params["maxDistConnectOutfallNodes"] = params["targetDx"]
 # % of the basin area in which water is stored in a node
 params["juApondPer"] = 0.75
 # Water depth at start of simulation (ft or m) (default is 0).
@@ -107,11 +112,13 @@ def mainCleanWorkspace(workspace):
     print "Finalizado el limpiado del directorio de trabajo."
 
 
-def mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared, rasterFileDEM):
+def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
+    shpFileDrainagePrepared, rasterFileDEM):
     print "STARTED: Drainage network preparation"
 
     # Read the original drainage network
-    streams = gis.leer_shp_polilineas(shpFileDrainageOriginal, ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+    streams = gis.leer_shp_polilineas(shpFileDrainageOriginal,
+        ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
     spatial_ref = gis.leer_spatial_reference(shpFileDrainageOriginal)
 
     # Write a shape file with the nodes of the network
@@ -245,7 +252,7 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
                      levelIni = stream[6],
                      levelFin = stream[7]) for stream in streams]
 
-    # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide (100m)
+    # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide
     for stream in streams:
         insertPoints(stream.points, params["maxLengthForStreamSpanDivide"])
 
@@ -274,7 +281,7 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
         stream.points[-1] = snap(stream.points[-1], stream, streams)
 
 
-    # Join streams spans shorter than minLengthForStreamSpanJoin (75m) unless they've been "snapped"
+    # Join streams spans shorter than minLengthForStreamSpanJoin unless they've been "snapped"
     for stream in streams:
         removePoints(stream.points, params["minLengthForStreamSpanJoin"], snappedPoints)
 
@@ -304,77 +311,86 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
 def readStreets(nodos, links, shpFileCalles):
     print "Proceso de creado de calles"
 
-    calles = gis.leer_shp_polilineas(shpFileCalles, ['ANCHO'])
+    streets = gis.leer_shp_polilineas(shpFileCalles, ['ANCHO'])
+    streets = [Bunch(points = street[0],
+                     w = street[1]) for street in streets]
 
-    for (i,calle) in enumerate(calles):
+    for street in streets:
+        if len(street.points) < 2:
+            continue
+
+        # Subdivide the street in spans shorter than maxLengthForStreetSpanDivide
+        insertPoints(street.points, params["maxLengthForStreetSpanDivide"])
+        # Join streams spans shorter than minLengthForStreetSpanJoin
+        removePoints(street.points, params["minLengthForStreetSpanJoin"], [])
+
+    for (i, street) in enumerate(streets):
         if i % 100 == 0:
-            print "Procesando calle " + str(i) + " de " + str(len(calles))
-
-        puntos, ancho = calle[0], calle[1]
+            print "Procesando calle " + str(i) + " de " + str(len(streets))
 
         # Si el ancho es nulo
-        if (ancho == 0):
+        if (street.w == 0):
             continue
 
-        # Si la polilinea es incorrecta
-        if len(puntos) < 2:
-            print "Error"
-            print puntos
+        if len(street.points) < 2:
             continue
 
-        # Crear u obtener los nodos extremos
-        with timing.getTimer("addNode"):
-            n0 = addNode(nodos, puntos[0], "corner")
-        with timing.getTimer("addNode"):
-            n1 = addNode(nodos, puntos[-1], "corner")
+        for p0, p1 in pairwise(street.points):
 
-        # Si la polilinea es demasiado corta
-        if n0 == n1:
-            continue
+            # Calculate
+            # Crear u obtener los nodos extremos
+            with timing.getTimer("addNode"):
+                n0 = addNode(nodos, p0, "corner")
+            with timing.getTimer("addNode"):
+                n1 = addNode(nodos, p1, "corner")
 
-        # Verificar si la calle atraviesa un arroyo
-        with timing.getTimer("atraviesaArroyo"):
-            channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, links)
+            # Si la polilinea es demasiado corta
+            if n0 == n1:
+                continue
 
-        if channel_data is not None:
-            nch0, nch1, channel_link = channel_data
-            p4 = intersection(nodos[n0].p, nodos[n1].p, nodos[nch0].p, nodos[nch1].p)
+            # Verificar si la calle atraviesa un arroyo
+            with timing.getTimer("atraviesaArroyo"):
+                channel_data = atraviesaArroyo(nodos[n0].p, nodos[n1].p, nodos, links)
 
-            nchannel = nch0 if dist(nodos[nch0].p, p4) <= dist(nodos[nch1].p, p4) else nch1
+            if channel_data is not None:
+                nch0, nch1, channel_link = channel_data
+                p4 = intersection(nodos[n0].p, nodos[n1].p, nodos[nch0].p, nodos[nch1].p)
 
-            # Dividir primero el arroyo si vale la pena (distancia al nodo más
-            # cercano > a 15% maxLengthForStreamSpanDivide)
-            if (min(dist(nodos[nch0].p, p4), dist(nodos[nch1].p, p4)) >
-                params["maxLengthForStreamSpanDivide"] * 0.15):
+                nchannel = nch0 if dist(nodos[nch0].p, p4) <= dist(nodos[nch1].p, p4) else nch1
 
-                with timing.getTimer("addNode"):
-                    nchannel = addNode(nodos, p4, "channel", 0)
+                # Dividir primero el arroyo si vale la pena (distancia al nodo más
+                # cercano > a 15% maxLengthForStreamSpanDivide)
+                if (min(dist(nodos[nch0].p, p4), dist(nodos[nch1].p, p4)) >
+                    params["maxLengthForStreamSpanDivide"] * 0.15):
 
-                alpha = dist(nodos[nch0].p, nodos[nchannel].p) / dist(nodos[nch0].p, nodos[nch1].p)
-                levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
+                    with timing.getTimer("addNode"):
+                        nchannel = addNode(nodos, p4, "channel", 0)
 
-                links[(nch0, nchannel)] = {"type": channel_link["type"],
-                                           "w": channel_link["w"],
-                                           "h": channel_link["h"],
-                                           "levelIni": channel_link["levelIni"],
-                                           "levelFin": levelMid}
-                links[(nchannel, nch1)] = {"type": channel_link["type"],
-                                           "w": channel_link["w"],
-                                           "h": channel_link["h"],
-                                           "levelIni": levelMid,
-                                           "levelFin": channel_link["levelFin"]}
-                del links[(nch0, nch1)]
+                    alpha = dist(nodos[nch0].p, nodos[nchannel].p) / dist(nodos[nch0].p, nodos[nch1].p)
+                    levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
 
-            # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
-            if n0 != nchannel:
-                # Crear un nuevo vertedero
-                links[(n0, nchannel)] = {"type":"weir", "w":ancho}
-            if n1 != nchannel:
-                # Crear un nuevo vertedero
-                links[(n1, nchannel)] = {"type":"weir", "w":ancho}
-        else:
-            # No atraviesa --> crear una calle comun
-            links[(n0, n1)] = {"type":"street", "w":ancho}
+                    links[(nch0, nchannel)] = {"type": channel_link["type"],
+                                               "w": channel_link["w"],
+                                               "h": channel_link["h"],
+                                               "levelIni": channel_link["levelIni"],
+                                               "levelFin": levelMid}
+                    links[(nchannel, nch1)] = {"type": channel_link["type"],
+                                               "w": channel_link["w"],
+                                               "h": channel_link["h"],
+                                               "levelIni": levelMid,
+                                               "levelFin": channel_link["levelFin"]}
+                    del links[(nch0, nch1)]
+
+                # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
+                if n0 != nchannel:
+                    # Crear un nuevo vertedero
+                    links[(n0, nchannel)] = {"type":"weir", "w":street.w}
+                if n1 != nchannel:
+                    # Crear un nuevo vertedero
+                    links[(n1, nchannel)] = {"type":"weir", "w":street.w}
+            else:
+                # No atraviesa --> crear una calle comun
+                links[(n0, n1)] = {"type":"street", "w":street.w}
 
     print "Finalizado proceso de creado de calles"
 
