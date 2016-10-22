@@ -422,7 +422,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             gageMethod,
             self.rainFileName,
             self.rasterFileCoeficiente,
-            "pluviom.dat",
+            self.modelFolder + "/" + "pluviom.dat",
             self.stationsFileName,
             self.modelFolder + "/" + self.modelFileName + ".inp")
 

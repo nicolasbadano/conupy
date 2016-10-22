@@ -671,7 +671,7 @@ def createOutfallNodes(nodos, shpFileNodosBorde):
 
 
 def createRainGagesMethod0(centros, gageFileName, rasterFileCoeficiente, gagesFileName):
-    print "Leyendo pluviometro único..."
+    print "Leyendo pluviometro maestro..."
 
     with open(gageFileName, "r") as iFile:
         lineas = iFile.readlines()
@@ -685,9 +685,9 @@ def createRainGagesMethod0(centros, gageFileName, rasterFileCoeficiente, gagesFi
 
             gage = {}
             gage["name"] = 'GAGE'+str(coef)
-            gage["file"] = gagesFileName
+            _, gage["file"] = os.path.split(gagesFileName)
             gage["interval"] = '0:05'
-            gages.append[gage]
+            gages.append(gage)
 
             for linea in lineas:
                 datos = linea.split()
@@ -713,7 +713,6 @@ def createRainGagesMethod0(centros, gageFileName, rasterFileCoeficiente, gagesFi
 
 
 def createRainGagesMethod1(centros, stationsFileName):
-
     print "Leyendo lista de pluviometros..."
     gages = []
     with open(stationsFileName, "r") as f:
