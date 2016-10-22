@@ -780,25 +780,30 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
 
         tF.write("\n")
         tF.write("[OPTIONS]\n")
-        tF.write("FLOW_UNITS         CMS\n")
-        tF.write("INFILTRATION       HORTON\n") #CURVE_NUMBER
-        tF.write("FLOW_ROUTING       DYNWAVE\n")
-        tF.write("LINK_OFFSETS       ELEVATION\n")
-        tF.write("START_DATE         7/8/2013\n")
-        tF.write("START_TIME         00:00\n")
-        tF.write("END_TIME           06:00\n")
-        tF.write("WET_STEP           00:00:30\n")
-        tF.write("DRY_STEP           00:01:00\n")
-        tF.write("ROUTING_STEP       00:00:30\n")
+        tF.write("FLOW_UNITS           CMS\n")
+        tF.write("INFILTRATION         HORTON\n") #CURVE_NUMBER
+        tF.write("FLOW_ROUTING         DYNWAVE\n")
+        tF.write("LINK_OFFSETS         ELEVATION\n")
+        tF.write("START_DATE           07/08/2013\n")
+        tF.write("START_TIME           00:00\n")
+        tF.write("END_TIME             06:00\n")
+        tF.write("WET_STEP             00:00:30\n")
+        tF.write("DRY_STEP             00:01:00\n")
+        tF.write("ROUTING_STEP         00:00:30\n")
+        tF.write("ALLOW_PONDING        YES\n")
+        tF.write("INERTIAL_DAMPING     FULL\n")
+        tF.write("MAX_TRIALS           100\n")
+        tF.write("HEAD_TOLERANCE       0.001\n")
+        tF.write("MINIMUM_STEP         1\n")
+        tF.write("THREADS              4\n")
         # Minimum Surface Area - This is a minimum surface area used at nodes when computing changes in water depth. If 0 is entered, then the default value of 12.566 ft2 (1.167 m2) is used. This is the area of a 4-ft diameter manhole. The value entered should be in square feet for US units or square meters for SI units.
-        #tF.write("MIN_SURFAREA       75.54\n") #m2, equivalente a 10 m de diametro
-        tF.write("MIN_SURFAREA       1.167\n") #m2, equivalente a 10 m de diametro
+        tF.write("MIN_SURFAREA         1.167\n") #m2, equivalente a 10 m de diametro
         tF.write("\n")
 
         tF.write("[FILES]\n")
-        tF.write("SAVE RAINFALL      rainfall.rff\n")
-        tF.write("SAVE RUNOFF        runoff.rof\n")
-        tF.write("SAVE OUTFLOWS      outflows.txt\n")
+        tF.write("SAVE RAINFALL        rainfall.rff\n")
+        tF.write("SAVE RUNOFF          runoff.rof\n")
+        tF.write("SAVE OUTFLOWS        outflows.txt\n")
 
 
         tF.write("\n")
