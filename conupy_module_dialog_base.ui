@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1231</width>
-    <height>835</height>
+    <height>777</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -55,45 +55,10 @@
          <string>Preparación del Modelo</string>
         </property>
         <layout class="QGridLayout" name="gridLayout_5">
-         <item row="2" column="3">
-          <widget class="QPushButton" name="btnActionBordes">
-           <property name="text">
-            <string>Leer nodos de borde</string>
-           </property>
-          </widget>
-         </item>
-         <item row="0" column="3">
-          <widget class="QPushButton" name="btnActionArroyosCalles">
-           <property name="text">
-            <string>Leer red de drenaje y calles</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="0">
-          <widget class="QPushButton" name="btnActionInverts">
-           <property name="text">
-            <string>Calcular inverts</string>
-           </property>
-          </widget>
-         </item>
          <item row="0" column="2">
           <widget class="QPushButton" name="btnActionPrepareDrainageNetwork">
            <property name="text">
             <string>Preparar red de drenaje</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="2">
-          <widget class="QPushButton" name="btnActionSample">
-           <property name="text">
-            <string>Muestrear rasters en los nodos</string>
-           </property>
-          </widget>
-         </item>
-         <item row="2" column="0">
-          <widget class="QPushButton" name="btnActionSubcuencas">
-           <property name="text">
-            <string>Crear y leer subcuencas</string>
            </property>
           </widget>
          </item>
@@ -104,17 +69,10 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="3">
+         <item row="0" column="3">
           <widget class="QPushButton" name="btnActionSWMM">
            <property name="text">
-            <string>Generar archivo SWMM</string>
-           </property>
-          </widget>
-         </item>
-         <item row="4" column="2">
-          <widget class="QPushButton" name="btnActionGenerateRain">
-           <property name="text">
-            <string>Generar precipitación por subcuenca</string>
+            <string>Generar modelo SWMM</string>
            </property>
           </widget>
          </item>

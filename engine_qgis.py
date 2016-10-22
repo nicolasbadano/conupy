@@ -274,8 +274,8 @@ def create_thiessen_polygons(nodesFile, fileName):
 def clip_feature(originalFile, clipPolygonFile, fileName):
     print "Recortando feature. Destino: " + fileName
 
-    originalLayer = qgis.core.QgsVectorLayer(originalFile, "capa1", "ogr")
-    clipLayer = qgis.core.QgsVectorLayer(clipPolygonFile, "capa2", "ogr")
+    originalLayer = qgis.core.QgsVectorLayer(originalFile, "capa3", "ogr")
+    clipLayer = qgis.core.QgsVectorLayer(clipPolygonFile, "capa4", "ogr")
     processing.runalg("qgis:clip", originalLayer, clipLayer, fileName)
 
     print "Finalizado el recortado."

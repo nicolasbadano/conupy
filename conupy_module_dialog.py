@@ -77,13 +77,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
 
         self.btnActionLimpiarWorkspace.clicked.connect(self.btnActionLimpiarWorkspace_click)
         self.btnActionPrepareDrainageNetwork.clicked.connect(self.btnActionPrepareDrainageNetwork_click)
-        self.btnActionArroyosCalles.clicked.connect(self.btnActionArroyosCalles_click)
-        self.btnActionSubcuencas.clicked.connect(self.btnActionSubcuencas_click)
-        self.btnActionSample.clicked.connect(self.btnActionSample_click)
-        self.btnActionBordes.clicked.connect(self.btnActionBordes_click)
-        self.btnActionInverts.clicked.connect(self.btnActionInverts_click)
         self.btnActionSWMM.clicked.connect(self.btnActionSWMM_click)
-        self.btnActionGenerateRain.clicked.connect(self.btnActionGenerateRain_click)
         self.btnActionProfMuertas.clicked.connect(self.btnActionProfMuertas_click)
         self.btnActionExtraerProf.clicked.connect(self.btnActionExtraerProf_click)
 
@@ -408,49 +402,6 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         os.chdir(self.workspace)
         conuPy.mainPrepareDrainageNetwork(self.shpFileDrainageNetworkOriginal, self.shpFileDrainageNetworkPrepared, self.rasterFileDEM)
 
-    # Event handlers de btnActionArroyosCalles
-    def btnActionArroyosCalles_click(self):
-        reload(conuPy)
-        # Redireccionar stdout a la caja de texto
-        sys.stdout = WriteStreamInmediate(self.textInfo)
-
-        os.chdir(self.workspace)
-        conuPy.mainReadDrainageNetwork(self.shpFileDrainageNetworkPrepared)
-        conuPy.mainReadStreets(self.shpFileCalles)
-
-    # Event handlers de btnActionSubcuencas
-    def btnActionSubcuencas_click(self):
-        # Redireccionar stdout a la caja de texto
-        sys.stdout = WriteStreamInmediate(self.textInfo)
-
-        os.chdir(self.workspace)
-        conuPy.mainGetSubcatchments(self.shpFileCuenca)
-
-    # Event handlers de btnActionSample
-    def btnActionSample_click(self):
-        # Redireccionar stdout a la caja de texto
-        sys.stdout = WriteStreamInmediate(self.textInfo)
-
-        os.chdir(self.workspace)
-        conuPy.mainSampleNodeData(self.rasterFileDEM,
-                                  self.rasterFileSlope,
-                                  self.rasterFileImpermeabilidad)
-
-    # Event handlers de btnActionBordes
-    def btnActionBordes_click(self):
-        # Redireccionar stdout a la caja de texto
-        sys.stdout = WriteStreamInmediate(self.textInfo)
-
-        os.chdir(self.workspace)
-        conuPy.mainCreateOutfallNodes(self.shpFileNodosBorde)
-
-    # Event handlers de btnActionInverts
-    def btnActionInverts_click(self):
-        # Redireccionar stdout a la caja de texto
-        sys.stdout = WriteStreamInmediate(self.textInfo)
-
-        os.chdir(self.workspace)
-        conuPy.mainCalculateInvertOffsets()
 
     # Event handlers de btnActionSWMM
     def btnActionSWMM_click(self):
@@ -458,7 +409,22 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         sys.stdout = WriteStreamInmediate(self.textInfo)
 
         os.chdir(self.workspace)
-        conuPy.mainCreateSWMM(self.modelFolder + "/" + self.modelFileName + ".inp")
+
+        gageMethod = "createRainGagesMethod0" if self.precipitationMethod == 0 else "createRainGagesMethod1"
+        conuPy.mainCreateSWMMModel(
+            self.shpFileDrainageNetworkPrepared,
+            self.shpFileCalles,
+            self.shpFileCuenca,
+            self.rasterFileDEM,
+            self.rasterFileSlope,
+            self.rasterFileImpermeabilidad,
+            self.shpFileNodosBorde,
+            gageMethod,
+            self.rainFileName,
+            self.rasterFileCoeficiente,
+            "pluviom.dat",
+            self.stationsFileName,
+            self.modelFolder + "/" + self.modelFileName + ".inp")
 
     # Event handlers de btnActionGenerateRain
     def btnActionGenerateRain_click(self):

@@ -24,3 +24,5 @@ class Timing(object):
     def dump(self):
         for key, (ttime, num) in self.timers.iteritems():
             print "Code %s was called %i times and took an average of %f ms" % (key, num, ttime / num * 1000)
+
+timing = Timing()
