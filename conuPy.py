@@ -419,7 +419,9 @@ def createWeirs(nodos, links):
             # Buscar el tramo de arroyo mas cercano
             nearLinks = links.getLinksNear(nodo.p, params["maxDistWeir"])
             mindist, minj = params["maxDistWeir"], -1
-            for n10, n11 in nearLinks.keys():
+            for (n10, n11), link  in nearLinks.items():
+                if link["type"] != "channel":
+                    continue
                 p10, p11 = nodos[n10].p, nodos[n11].p
                 d = distToSegment(nodo.p, p10, p11)
                 if d < mindist:
