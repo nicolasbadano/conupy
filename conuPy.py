@@ -817,12 +817,12 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
-            if nodo.type != "2d":
+            if not nodo.type in ["conduit", "2d"]:
                 continue
-            list = ['NODO'+str(i),
+            list = ['NODO%d' % i,
                     "%.3f" % (nodo.elev + nodo.offset),
-                    "%.3f" % (-nodo.offset+20),
-                    params["juY0"],
+                    "%.3f" % (-nodo.offset + 20),
+                    "%.3f" % params["juY0"],
                     "%.3f" % 0,
                     "%.3f" % nodo.area]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -834,15 +834,15 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Ymax           Y0             TABULAR        Apond          ) \n")
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
-            if nodo.type == "2d":
+            if nodo.type in ["conduit", "2d"]:
                 continue
             tF.write(("").join([ str(x).ljust(15, ' ') for x in [
-                'NODO'+str(i),
+                'NODO%d' % i,
                 "%.3f" % (nodo.elev + nodo.offset),
                 "%.3f" % (-nodo.offset+20),
-                params["juY0"],
+                "%.3f" % params["juY0"],
                 'TABULAR',
-                'STORAGE'+str(i),
+                'STORAGE%d' % i,
                 "%.3f" % nodo.area]]))
             tF.write("\n")
 
@@ -853,9 +853,22 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
             if (nodo.offset < 0):
-                list = ['STORAGE'+str(i), 'STORAGE', 0, 1.167, -nodo.offset, 1.167, -nodo.offset+1, "%.3f" % (nodo.area/10), -nodo.offset+2, "%.3f" % nodo.area, -nodo.offset+20, "%.3f" % nodo.area]
+                list = [
+                    'STORAGE%d' % i,
+                    'STORAGE',
+                    "%.3f" % 0, 1.167,
+                    "%.3f" % (-nodo.offset),      "%.3f" % 1.167,
+                    "%.3f" % (-nodo.offset + 1),  "%.3f" % (nodo.area/10),
+                    "%.3f" % (-nodo.offset + 2),  "%.3f" % nodo.area,
+                    "%.3f" % (-nodo.offset + 20), "%.3f" % nodo.area]
             else:
-                list = ['STORAGE'+str(i), 'STORAGE', 0, 1.167, 1, "%.3f" % (nodo.area/10), 2, "%.3f" % nodo.area, 20, "%.3f" % nodo.area]
+                list = [
+                    'STORAGE%d' % i,
+                    'STORAGE',
+                    "%.3f" % 0,                   "%.3f" % 1.167,
+                    "%.3f" % 1,                   "%.3f" % (nodo.area/10),
+                    "%.3f" % 2,                   "%.3f" % nodo.area,
+                    "%.3f" % 20,                  "%.3f" % nodo.area]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
@@ -865,7 +878,11 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Type           Gate\n")
         tF.write(";;==========================================================\n")
         for (i, nodo) in enumerate(nodosOutfall):
-            list = ['NODOOUT'+str(i), nodo.elev, "FREE", "NO"]
+            list = [
+                'NODOOUT'+str(i),
+                nodo.elev,
+                "FREE",
+                "NO"]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
@@ -877,11 +894,35 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
             name = link["type"] + str(i)
             length = dist(nodos[in0].p, nodos[in1].p)
             if link["type"] == "street":
-                list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodos[in0].elev, "%.3f" % nodos[in1].elev, 0]
+                list = [
+                    name,
+                    'NODO'+str(in0),
+                    'NODO'+str(in1),
+                    "%.3f" % length,
+                    "%.3f" % params["coN"],
+                    "%.3f" % nodos[in0].elev,
+                    "%.3f" % nodos[in1].elev,
+                    0]
             elif link["type"] == "2d":
-                list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % nodos[in0].elev, "%.3f" % nodos[in1].elev, 0]
+                list = [
+                    name,
+                    'NODO'+str(in0),
+                    'NODO'+str(in1),
+                    "%.3f" % length,
+                    "%.3f" % params["coN"],
+                    "%.3f" % nodos[in0].elev,
+                    "%.3f" % nodos[in1].elev,
+                    0]
             elif link["type"] in ["channel", "conduit"]:
-                list = [name, 'NODO'+str(in0), 'NODO'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % link["levelIni"], "%.3f" % link["levelFin"], 0]
+                list = [
+                    name,
+                    'NODO'+str(in0),
+                    'NODO'+str(in1),
+                    "%.3f" % length,
+                    "%.3f" % params["coN"],
+                    "%.3f" % link["levelIni"],
+                    "%.3f" % link["levelFin"],
+                    0]
             else:
                 continue
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -890,7 +931,15 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
             in0, in1, ancho = linea
             name = 'SALIDA' + str(i)
             length = dist(nodos[in0].p, nodosOutfall[in1].p)
-            list = [name, 'NODO'+str(in0), 'NODOOUT'+str(in1), "%.3f" % length, "%.3f" % params["coN"], "%.3f" % (nodos[in0].elev+nodos[in0].offset), "%.3f" % (nodos[in0].elev+nodos[in0].offset), 0]
+            list = [
+                name,
+                'NODO'+str(in0),
+                'NODOOUT'+str(in1),
+                "%.3f" % length,
+                "%.3f" % params["coN"],
+                "%.3f" % (nodos[in0].elev+nodos[in0].offset),
+                "%.3f" % (nodos[in0].elev+nodos[in0].offset),
+                0]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
@@ -1049,11 +1098,11 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Node         xcoord         ycoord         \n")
         tF.write(";;===========================================\n")
         for (i, nodo) in enumerate(nodos):
-            list = ['NODO'+str(i), nodo.p[0], nodo.p[1]]
+            list = ['NODO%d' % i, nodo.p[0], nodo.p[1]]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
         for (i, nodo) in enumerate(nodosOutfall):
-            list = ['NODOOUT'+str(i), nodo.p[0], nodo.p[1]]
+            list = ['NODOOUT%d' % i, nodo.p[0], nodo.p[1]]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
@@ -1091,7 +1140,7 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     outfile = swmmout.open(swmmOuputFileName)
 
     query_vars = ['head']
-    query_nodes = ['NODO'+str(i) for i, nodo in enumerate(nodos)]
+    query_nodes = ['NODO%d' % i for i, nodo in enumerate(nodos)]
     data = outfile.get_values('nodes', query_nodes, query_vars)
 
     # Conseguir la referencia geografica
