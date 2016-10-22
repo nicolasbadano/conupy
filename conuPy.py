@@ -100,7 +100,15 @@ params["maxDist2DConnection"] = 1.5 * params["cellSize2D"]
 # Number of discrete gages
 params["numDiscreteGages"] = 21
 
+def print_decorate(func):
+    def wrapper(*args, **kwargs):
+        print "INFO: ENTERED %s" % func.__name__
+        ret = func(*args, **kwargs)
+        print "INFO: EXITED %s" % func.__name__
+        return ret
+    return wrapper
 
+@print_decorate
 def mainCleanWorkspace(workspace):
     print "Limpiando el directorio de trabajo..."
 
@@ -110,15 +118,13 @@ def mainCleanWorkspace(workspace):
         try:
             os.remove(f)
         except:
-            print "\t" + f + " no pudo ser borrado."
+            print "ERROR: " + f + " no pudo ser borrado."
 
     print "Finalizado el limpiado del directorio de trabajo."
 
-
+@print_decorate
 def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     shpFileDrainagePrepared, rasterFileDEM):
-    print "STARTED: Drainage network preparation"
-
     # Read the original drainage network
     streams = gis.leer_shp_polilineas(shpFileDrainageOriginal,
         ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
@@ -192,9 +198,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     fields["slope"]    = [float((stream[6] - stream[7]) / stream[8]) for stream in streams]
     gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
 
-    print "FINISHED: Drainage network preparation"
-
-
+@print_decorate
 def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad,
     shpFileNodosBorde, gageMethod, gageFileName, rasterFileCoeficiente,
@@ -241,10 +245,8 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     # Write the model file
     writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall, gages, subcatchmentGages, swmmInputFileName)
 
-
+@print_decorate
 def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
-    print "STARTED: Drainage network construction"
-
     # Read the prepared drainage network
     streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
     streams = [Bunch(points = stream[0],
@@ -309,10 +311,8 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     print "\tNumber of links for the drainage network: %i" % len(links)
     print "FINISHED: Drainage network construction"
 
-
+@print_decorate
 def readStreets(nodos, links, shpFileCalles):
-    print "Proceso de creado de calles"
-
     streets = gis.leer_shp_polilineas(shpFileCalles, ['ANCHO'])
     streets = [Bunch(points = street[0],
                      w = float(street[1])) for street in streets]
@@ -394,9 +394,7 @@ def readStreets(nodos, links, shpFileCalles):
                 # No atraviesa --> crear una calle comun
                 links[(n0, n1)] = {"type":"street", "w":street.w}
 
-    print "Finalizado proceso de creado de calles"
-
-
+@print_decorate
 def createGutters(nodos, links):
     # Crear sumideros
     print "Creando sumideros"
@@ -425,7 +423,7 @@ def createGutters(nodos, links):
             # Crear un sumidero
             links[(n0, n1)] = {"type":"gutter", "w":params["xsSumideroW"]}
 
-
+@print_decorate
 def createWeirs(nodos, links):
     # Crear vertederos
     print "Creando vertederos"
@@ -460,7 +458,7 @@ def createWeirs(nodos, links):
     timing.dump()
 
 
-
+@print_decorate
 def generate2dZones(nodos, links, shpFile2dZones):
     minX, maxX, minY, maxY = [int(x) for x in gis.get_extent(shpFile2dZones)]
     junctions = []
@@ -544,10 +542,8 @@ def generate2dZones(nodos, links, shpFile2dZones):
         # Crear un sumidero
         links[(n0, n1)] = {"type":"2d", "w":params["cellSize2D"]}
 
-
+@print_decorate
 def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad, spatial_ref):
-    print "Proceso de calculo de elevaciones"
-
     gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], {}, spatial_ref)
     nodosElev = gis.sample_raster_on_nodes(shpFileNodos, rasterFileDEM)
     nodosSlope = gis.sample_raster_on_nodes(shpFileNodos, rasterFileSlope)
@@ -578,7 +574,7 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
         if link["type"] == "street":
             link["levelIni"] = nodos[n0].elev
             link["levelFin"] = nodos[n1].elev
-        elif link["type"] in ["weir", "orifice"]:
+        elif link["type"] in ["weir", "gutter"]:
             link["levelIni"] = nodos[n0].elev
             link["levelFin"] = nodos[n1].elev + nodos[n1].offset
 
@@ -586,12 +582,10 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
                 if link["levelFin"] > link["levelIni"]:
                     print "WARNING: Weir %s - channel node invert is higher than the weir crest. This creates instabilties in SWMM."
 
-    print "Finalizado el calculo de elevaciones"
-
-
+@print_decorate
 def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
-    print "Numero de nodos:\t%d" % len(nodos)
-    print "Numero de links:\t%d" % len(links)
+    print u"Número de nodos: %d" % len(nodos)
+    print u"Número de links: %d" % len(links)
 
     # Escribir shape con la posicion de los nodos
     campos = OrderedDict()
@@ -620,19 +614,18 @@ def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
             campos["elev0"].append(float(link["levelIni"]))
             campos["elev1"].append(float(link["levelFin"]))
         except:
-            print "Error: link=", link
+            print "ERROR: Link (%d,%d) with type %s is missing w, levelIni or levelFin data." % (n0, n1, link["type"])
+            print link
     gis.escribir_shp_polilineas(shpFileLineas, polilineas, campos, spatial_ref)
 
-
+@print_decorate
 def createSubcatchments(nodos, shpFileCuenca, spatial_ref):
-    print "Proceso de creado de cuencas"
-
     # Crear centros de cuencas
     centros = []
     for (i, nodo) in enumerate(nodos):
         if nodo.type != "conduit":
             centros.append([nodo.p[0], nodo.p[1], i])
-    print "Numero de cuencas: ", len(centros)
+    print "Numero de cuencas:\t%d" % len(centros)
     # Escribir shape con la posicion de los baricentros de subcuencas
     gis.escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
 
@@ -662,15 +655,11 @@ def createSubcatchments(nodos, shpFileCuenca, spatial_ref):
     for i in range(0,len(centros)):
         subcuencasCompletas.append(subcuencasDict.get(i, [[], 0]))
 
-    print "Finalizado proceso de creado de cuencas"
     return centros, subcuencasCompletas
 
-
+@print_decorate
 def createOutfallNodes(nodos, shpFileNodosBorde):
-    print "Proceso de generacion de nodos outfall..."
-
     posicionesNodosOutfall = gis.leer_shp_puntos(shpFileNodosBorde)
-    print posicionesNodosOutfall
 
     nodosOutfall = []
     lineasOutfall = []
@@ -690,10 +679,9 @@ def createOutfallNodes(nodos, shpFileNodosBorde):
 
         lineasOutfall.append( [i, len(nodosOutfall)-1, params["maxDistConnectOutfallNodes"]] )
 
-    print "Finalizado proceso de generacion de nodos outfall"
     return nodosOutfall, lineasOutfall
 
-
+@print_decorate
 def createRainGagesMethod0(centros, gageFileName, rasterFileCoeficiente, gagesFileName):
     print "Leyendo pluviometro maestro..."
 
@@ -732,10 +720,9 @@ def createRainGagesMethod0(centros, gageFileName, rasterFileCoeficiente, gagesFi
         gageName = 'GAGE' + str(coef - (coef%(100/(params["numDiscreteGages"]-1))))
         subcatchmentGages.append(gageName)
 
-    print "Finalizado el procesamiento de pluviómetros"
     return gages, subcatchmentGages
 
-
+@print_decorate
 def createRainGagesMethod1(centros, stationsFileName):
     print "Leyendo lista de pluviometros..."
     gages = []
@@ -762,13 +749,10 @@ def createRainGagesMethod1(centros, stationsFileName):
 
         subcatchmentGages.append(minGage.name)
 
-    print "Finalizado el procesamiento de pluviómetros"
     return gages, subcatchmentGages
 
-
+@print_decorate
 def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall, gages, subcatchmentGages, swmmInputFileName):
-    print "Proceso de escritura de archivo SWMM..."
-
     for nodo in nodos:
         nodo.area = 1.167
     for (i, centro) in enumerate(centros):
@@ -1191,9 +1175,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
         tF.write("\n")
 
-    print "Finalizado el proceso de escritura de archivo SWMM"
-
-
+@print_decorate
 def mainReadSWMMResultsDepths(swmmOuputFileName):
     nodos = readFromFile('nodos')
 
@@ -1224,7 +1206,7 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     campos["depth"] = [max(nodo.maxHead - (nodo.elev + nodo.offset), 0) for nodo in nodos]
     gis.escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
-
+@print_decorate
 def mainCalculateDeadDepths():
     nodos = readFromFile('nodos')
     links = readFromFile('links')

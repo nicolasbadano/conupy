@@ -38,7 +38,14 @@ class WriteStreamInmediate(object):
 
     def write(self, text):
         self.textBox.moveCursor(QtGui.QTextCursor.End)
+        if "INFO:" in text:
+            self.textBox.setTextColor(QtGui.QColor(0,255,0))
+        elif "WARNING:" in text or "ERROR:" in text:
+            self.textBox.setTextColor(QtGui.QColor(255,0,0))
+        else:
+            self.textBox.setTextColor(QtGui.QColor(0,0,0))
         self.textBox.insertPlainText(text)
+
         QtGui.QApplication.processEvents()
 
 
