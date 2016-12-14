@@ -21,6 +21,8 @@ from timing import timing
 
 # Output fles
 shpFileNodesDrainageNetwork = "nodesDrainageNetwork.shp"
+shpFileNodesAlongNetwork    = "nodesAlongNetwork.shp"
+shpFileNodesNetworkDepth    = "nodesNetworkDepth.shp"
 shpFileNodosSample          = "nodosSample.shp"
 shpFileNodos                = "nodos.shp"
 shpFileCentros              = "centros.shp"
@@ -197,6 +199,35 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     fields["levelFin"] = [stream[7] for stream in streams]
     fields["slope"]    = [float((stream[6] - stream[7]) / stream[8]) for stream in streams]
     gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
+
+    # Create points along streams
+    pointsAlongNetwork = []
+    levelsAlongNetwork = []
+    for stream in streams:
+        points, _, _, _, _, _, levelIni, levelFin, length = stream
+        points = points[:]
+        insertPoints(points, 50)
+
+        prog = 0
+        levels = [float(levelIni)]
+        for p0, p1 in pairwise(points):
+            prog += dist(p0,p1)
+            levels.append(float(levelIni + prog / length * (levelFin - levelIni)))
+
+        pointsAlongNetwork.extend(points)
+        levelsAlongNetwork.extend(levels)
+
+    # Write points for sampling
+    gis.escribir_shp_puntos(shpFileNodesAlongNetwork, pointsAlongNetwork, {}, spatial_ref)
+    # Sample the terrain on the nodes
+    pointsTerrainLevels = gis.sample_raster_on_nodes(shpFileNodesAlongNetwork, rasterFileDEM)
+    # Write depths of points along the network
+    gis.escribir_shp_puntos(shpFileNodesNetworkDepth, pointsAlongNetwork, {
+        "depth": [pointsTerrainLevels[i] - level for i, level in enumerate(levelsAlongNetwork)],
+        "levelBot": levelsAlongNetwork,
+        "levelTer": pointsTerrainLevels
+    }, spatial_ref)
+
 
 @print_decorate
 def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
