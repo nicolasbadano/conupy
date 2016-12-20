@@ -254,13 +254,18 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     # Calculate elevations
     calculateElevations(nodos, links, shpFileNodosSample, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad, spatial_ref)
 
+    # Create outfalls
+    nodosOutfall, lineasOutfall = createOutfallNodes(nodos, shpFileNodosBorde)
+
+    # Calculate dead depths
+    calculateDeadDepths(nodos, links, lineasOutfall)
+
     # Write the network
     writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref)
 
     # Create subcatchments
     centros, subcuencas = createSubcatchments(nodos, shpFileCuenca, spatial_ref)
-    # Create outfalls
-    nodosOutfall, lineasOutfall = createOutfallNodes(nodos, shpFileNodosBorde)
+
 
     # Create raingages and map them to each subcatchment
     if gageMethod == "createRainGagesMethod0":
@@ -624,6 +629,7 @@ def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
     campos["elev"] = [float(nodo.elev) for nodo in nodos]
     campos["offs"] = [float(nodo.offset) for nodo in nodos]
     campos["inve"] = [float(nodo.elev + nodo.offset) for nodo in nodos]
+    campos["dead"] = [float(nodo.tirante) for nodo in nodos]
     gis.escribir_shp_puntos(shpFileNodos, [nodo.p for nodo in nodos], campos, spatial_ref)
     # Escribir shape con los links
     polilineas = []
@@ -1238,52 +1244,41 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     gis.escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
 @print_decorate
-def mainCalculateDeadDepths():
-    nodos = readFromFile('nodos')
-    links = readFromFile('links')
-    lineasOutfall = readFromFile('lineasOutfall')
+def calculateDeadDepths(nodos, links, lineasOutfall):
+    for nodo in nodos:
+        nodo.tirante = 100
+    for linea in lineasOutfall:
+        nodo0 = linea[0]
+        nodos[nodo0].tirante = 0
 
-    tirantes = [100 for nodo in nodos]
-    print lineasOutfall
     i = 0
     maxbajada = 100
     while maxbajada > 0.01:
         maxbajada = 0
-        for linea in lineasOutfall:
-            nodo0 = linea[0]
-            tirantes[nodo0] = 0
 
-        def igualar(nodo0, nodo1):
-            elev0 = nodos[nodo0].elev + tirantes[nodo0]
-            elev1 = nodos[nodo1].elev + tirantes[nodo1]
-            if elev0 <= elev1:
-                elev11 = max(nodos[nodo1].elev, elev0)
-                tirantes[nodo1] = elev11 - nodos[nodo1].elev
-                bajada = elev1 - elev11
-            else:
-                elev01 = max(nodos[nodo0].elev, elev1)
-                tirantes[nodo0] = elev01 - nodos[nodo0].elev
-                bajada = elev0 - elev01
+        def igualar(nodo0, nodo1, link):
+            linklevel = max(link["levelIni"], link["levelFin"])
+
+            elev0 = nodos[nodo0].elev + nodos[nodo0].offset + nodos[nodo0].tirante
+            elev1 = nodos[nodo1].elev + nodos[nodo1].offset + nodos[nodo1].tirante
+
+            newEle0 = min(elev0, max(linklevel, elev1))
+            newEle1 = min(elev1, max(linklevel, elev0))
+
+            bajada = max(elev0 - newEle0, elev1 - newEle1)
+
+            nodos[nodo0].tirante = newEle0 - (nodos[nodo0].elev + nodos[nodo0].offset)
+            nodos[nodo1].tirante = newEle1 - (nodos[nodo1].elev + nodos[nodo1].offset)
 
             return bajada
 
         for n0, n1 in links:
-            bajada = igualar(n0, n1)
+            link = links[(n0, n1)]
+            bajada = igualar(n0, n1, link)
             maxbajada = max(maxbajada, bajada)
 
         i += 1
         print "Iteracion %i - Max Bajada %f" % (i, maxbajada)
-
-    # Conseguir la referencia geografica
-    spatial_ref = gis.leer_spatial_reference(shpFileNodos)
-
-    # Escribir shape con las profundidades maximas
-    campos = {
-                "depth" : tirantes,
-                "nelev" : [nodo.elev for nodo in nodos]
-             }
-    gis.escribir_shp_puntos("nodesProfMuerta.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
-
 
 
 if __name__ == '__main__':
@@ -1322,7 +1317,6 @@ if __name__ == '__main__':
     print " 0 - Preparar red de drenaje"
     print " 1 - Crear modelo SWMM"
     print " 2 - Leer resultados y escribir shp con profundidad y elevacion en nodos"
-    print " 3 - Analisis de tirantes muertos"
     x = input("Opcion:")
     if (x == 0):
         mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared, rasterFileDEM)
@@ -1333,5 +1327,3 @@ if __name__ == '__main__':
             gagesFileName, stationsFileName, swmmInputFileName)
     elif (x == 2):
         mainReadSWMMResultsDepths(swmmOuputFileName)
-    elif (x == 3):
-        mainCalculateDeadDepths()
