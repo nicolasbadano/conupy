@@ -740,7 +740,7 @@ def createRainGagesMethod0(centros, gageFileName, rasterFileCoeficiente, gagesFi
             gage = {}
             gage["name"] = 'GAGE'+str(coef)
             _, gage["file"] = os.path.split(gagesFileName)
-            gage["interval"] = '0:05'
+            gage["interval"] = '0:10'
             gages.append(gage)
 
             for linea in lineas:
@@ -810,12 +810,13 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write("INFILTRATION         HORTON\n") #CURVE_NUMBER
         tF.write("FLOW_ROUTING         DYNWAVE\n")
         tF.write("LINK_OFFSETS         ELEVATION\n")
-        tF.write("START_DATE           07/08/2013\n")
+        tF.write("START_DATE           01/01/2017\n")
         tF.write("START_TIME           00:00\n")
+        tF.write("END_DATE             01/02/2017\n")
         tF.write("END_TIME             06:00\n")
-        tF.write("WET_STEP             00:00:30\n")
-        tF.write("DRY_STEP             00:01:00\n")
-        tF.write("ROUTING_STEP         00:00:30\n")
+        tF.write("WET_STEP             00:00:10\n")
+        tF.write("DRY_STEP             00:00:10\n")
+        tF.write("ROUTING_STEP         00:00:01\n")
         tF.write("ALLOW_PONDING        YES\n")
         tF.write("INERTIAL_DAMPING     FULL\n")
         tF.write("MAX_TRIALS           100\n")
