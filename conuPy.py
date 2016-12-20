@@ -1253,14 +1253,21 @@ def calculateDeadDepths(nodos, links, lineasOutfall):
         nodo0 = linea[0]
         nodos[nodo0].tirante = 0
 
+    # Collect links data
+    linksData = []
+    for n0, n1 in links:
+        link = links[(n0, n1)]
+        linklevel = max(link["levelIni"], link["levelFin"])
+        linksData.append((n0, n1, linklevel))
+    # Optimization: Sort links from lower to higher levels
+    linksData.sort(key=lambda tup: tup[2])
+
     i = 0
     maxbajada = 100
     while maxbajada > 0.01:
         maxbajada = 0
 
-        def igualar(nodo0, nodo1, link):
-            linklevel = max(link["levelIni"], link["levelFin"])
-
+        def igualar(nodo0, nodo1, linklevel):
             elev0 = nodos[nodo0].elev + nodos[nodo0].offset + nodos[nodo0].tirante
             elev1 = nodos[nodo1].elev + nodos[nodo1].offset + nodos[nodo1].tirante
 
@@ -1274,9 +1281,8 @@ def calculateDeadDepths(nodos, links, lineasOutfall):
 
             return bajada
 
-        for n0, n1 in links:
-            link = links[(n0, n1)]
-            bajada = igualar(n0, n1, link)
+        for n0, n1, linklevel in linksData:
+            bajada = igualar(n0, n1, linklevel)
             maxbajada = max(maxbajada, bajada)
 
         i += 1
