@@ -1068,13 +1068,13 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
 
             if link["type"] == "street":
                 tname = link["type"] + str(int(link["w"]))
-                transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
+                transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
                 list = [name, 'IRREGULAR', tname, 0, 0, 0]
             elif link["type"] == "2d":
                 list = [name, 'RECT_OPEN', 100, 20.0, 2, 0, 1]
             elif link["type"] == "channel":
                 tname = link["type"] + str(int(link["w"])) + "x" + str(int(link["h"]))
-                transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
+                transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
                 list = [name, 'IRREGULAR', tname, 0, 0, 0]
             elif link["type"] == "conduit":
                 list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0]
@@ -1082,10 +1082,6 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 list = [link["type"]+str(i), 'RECT_OPEN', params["xsVertederoH"], params["xsVertederoW"], 0, 0]
             elif link["type"] == "gutter":
                 list = [link["type"]+str(i), 'RECT_CLOSED', params["xsSumideroH"], params["xsSumideroW"], 0, 0]
-            elif link["type"] == "street":
-                tname = link["type"] + str(int(link["w"]))
-                transectas[tname] = [link["type"], tname, ancho, link.get("h",0)]
-                list = [name, 'IRREGULAR', tname, 0, 0, 0]
             else:
                 continue
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
