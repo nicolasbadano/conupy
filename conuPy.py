@@ -85,6 +85,7 @@ params["weCd"] = 3.0
 # Orifice parameters
 params["orCd"] = 0.65
 # XSection parameters
+params["outfallXsWidth"] = 50
 params["xsG1"], params["xsG3"], params["xsG4"] = 10, 0, 0
 params["xsSumideroH"], params["xsSumideroW"] = 0.15, 2.0
 params["xsVertederoH"], params["xsVertederoW"] = 10.0, 20.0
@@ -711,10 +712,11 @@ def createOutfallNodes(nodos, shpFileNodosBorde):
             continue
 
         nodoOutfall = Bunch(p = np.array(posicionesNodosOutfall[minj]),
-                            elev = nodo.elev)
+                            elev = nodo.elev,
+                            offset = nodo.offset)
         nodosOutfall.append(nodoOutfall)
 
-        lineasOutfall.append( [i, len(nodosOutfall)-1, params["maxDistConnectOutfallNodes"]] )
+        lineasOutfall.append( [i, len(nodosOutfall)-1, params["outfallXsWidth"]] )
 
     return nodosOutfall, lineasOutfall
 
@@ -945,7 +947,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         for (i, nodo) in enumerate(nodosOutfall):
             list = [
                 'NODOOUT'+str(i),
-                nodo.elev,
+                nodo.elev + nodo.offset,
                 "FREE",
                 "NO"]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
@@ -1002,8 +1004,8 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 'NODOOUT'+str(in1),
                 "%.3f" % length,
                 "%.3f" % params["coN"],
-                "%.3f" % nodos[in0].elev,
-                "%.3f" % nodos[in0].elev,
+                "%.3f" % (nodos[in0].elev + nodos[in0].offset),
+                "%.3f" % (nodos[in0].elev + nodos[in0].offset),
                 0]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
