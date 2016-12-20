@@ -286,12 +286,13 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
 def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     # Read the prepared drainage network
     streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
-    streams = [Bunch(points = stream[0],
+    streams = [Bunch(id = i,
+                     points = stream[0],
                      w = float(stream[1]),
                      h = float(stream[2]),
                      typ = str(stream[3]).lower(),
                      levelIni = float(stream[6]),
-                     levelFin = float(stream[7])) for stream in streams]
+                     levelFin = float(stream[7])) for i, stream in enumerate(streams)]
 
     # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide
     for stream in streams:
@@ -302,8 +303,7 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     for stream in streams:
         def snap(p, stream, streams):
             for targetStream in streams:
-                # Doing stream == targetStream triggers problems when comparing numpy arrays
-                if (stream.__dict__ == targetStream.__dict__):
+                if (stream.id == targetStream.id):
                     continue
                 mindist, minj = params["maxDistSnapStreamNodes"], -1
                 for (j, p2) in enumerate(targetStream.points):
