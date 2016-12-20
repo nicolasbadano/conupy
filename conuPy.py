@@ -626,6 +626,7 @@ def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
 
     # Escribir shape con la posicion de los nodos
     campos = OrderedDict()
+    campos["name"] = ['NODO%d' % i for i, _ in enumerate(nodos)]
     campos["type"] = [nodo.type for nodo in nodos]
     campos["elev"] = [float(nodo.elev) for nodo in nodos]
     campos["offs"] = [float(nodo.offset) for nodo in nodos]
@@ -635,15 +636,17 @@ def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
     # Escribir shape con los links
     polilineas = []
     campos = OrderedDict()
+    campos["name"] = []
     campos["n0"] = []
     campos["n1"] = []
     campos["type"]  = []
     campos["w"] = []
     campos["elev0"] = []
     campos["elev1"] = []
-    for (n0, n1) in links:
+    for i, (n0, n1) in enumerate(links):
         link = links[(n0, n1)]
         polilineas.append([nodos[n0].p, nodos[n1].p])
+        campos["name"].append(str(link["type"]) + str(i))
         campos["n0"].append(int(n0))
         campos["n1"].append(int(n1))
         campos["type"].append(str(link["type"]))
