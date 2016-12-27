@@ -927,7 +927,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 list = [
                     'STORAGE%d' % i,
                     'STORAGE',
-                    "%.3f" % 0, 1.167,
+                    "%.3f" % 0,                   "%.3f" % 1.167,
                     "%.3f" % (-nodo.offset),      "%.3f" % 1.167,
                     "%.3f" % (-nodo.offset + 1),  "%.3f" % (nodo.area/10),
                     "%.3f" % (-nodo.offset + 2),  "%.3f" % nodo.area,
