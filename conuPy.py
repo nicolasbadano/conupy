@@ -35,6 +35,7 @@ subcuencasAreaShpFile       = "subcuencasArea.shp"
 
 # Parameters
 params = {}
+params["nodeTypesAsJunctions"] = ["conduit", "2d", "channel"] #"corner"
 # Max dist for which channel and stream nodes are snapped together
 params["maxDistSnapStreamNodes"] = 20.0
 params["targetDx"] = 50.0
@@ -898,7 +899,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
-            if not nodo.type in ["conduit", "2d", "channel", "corner"]:
+            if not nodo.type in params["nodeTypesAsJunctions"]:
                 continue
             list = ['NODO%d' % i,
                     "%.3f" % (nodo.elev + nodo.offset),
@@ -915,7 +916,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Ymax           Y0             TABULAR        Apond          ) \n")
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
-            if nodo.type in ["conduit", "2d", "channel", "corner"]:
+            if nodo.type in params["nodeTypesAsJunctions"]:
                 continue
             tF.write(("").join([ str(x).ljust(15, ' ') for x in [
                 'NODO%d' % i,
