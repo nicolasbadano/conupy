@@ -1112,14 +1112,14 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
                 tF.write("\n")
                 list = ['GR',
-                        traTiranteArroyo + 20, -params["traAnchoMargenArroyo"] - ancho*0.5,
-                        traTiranteArroyo, -params["traAnchoMargenArroyo"] - ancho*0.5,
-                        traTiranteArroyo, -ancho*0.5,
-                        0, -ancho*0.5 + 0.25,
-                        0, ancho*0.5 - 0.25,
-                        traTiranteArroyo, ancho*0.5,
-                        traTiranteArroyo, params["traAnchoMargenArroyo"] + ancho*0.5,
-                        traTiranteArroyo + 20, params["traAnchoMargenArroyo"] + ancho*0.5]
+                        traTiranteArroyo + 3.0,        -ancho*0.5 - params["traAnchoMargenArroyo"],
+                        traTiranteArroyo + 0.5,        -ancho*0.5 - params["traAnchoMargenArroyo"],
+                        traTiranteArroyo,              -ancho*0.5,
+                        0,                             -ancho*0.5 + 0.25,
+                        0,                              ancho*0.5 - 0.25,
+                        traTiranteArroyo,               ancho*0.5,
+                        traTiranteArroyo + 0.5,         ancho*0.5 + params["traAnchoMargenArroyo"],
+                        traTiranteArroyo + 3.0,         ancho*0.5 + params["traAnchoMargenArroyo"]]
                 tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
                 tF.write("\n")
                 tF.write(";;-------------------------------------------\n")
@@ -1142,15 +1142,15 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
                 tF.write("\n")
                 list = ['GR',
-                        params["traAltoCordon"] + 20, -params["traAnchoVereda"] - ancho*0.5,
-                        params["traAltoCordon"], -params["traAnchoVereda"] - ancho*0.5,
-                        params["traAltoCordon"], -ancho*0.5,
-                        0, -ancho*0.5,
-                        params["traAltoCordon"], 0,
-                        0, ancho*0.5,
-                        params["traAltoCordon"], ancho*0.5,
-                        params["traAltoCordon"], params["traAnchoVereda"] + ancho*0.5,
-                        params["traAltoCordon"] + 20, params["traAnchoVereda"] + ancho*0.5]
+                        params["traAltoCordon"] + 3.0, -ancho*0.5 - params["traAnchoVereda"],
+                        params["traAltoCordon"] + 0.2, -ancho*0.5 - params["traAnchoVereda"],
+                        params["traAltoCordon"],       -ancho*0.5,
+                        0,                             -ancho*0.5,
+                        params["traAltoCordon"],        0,
+                        0,                              ancho*0.5,
+                        params["traAltoCordon"],        ancho*0.5,
+                        params["traAltoCordon"] + 0.2,  ancho*0.5 + params["traAnchoVereda"],
+                        params["traAltoCordon"] + 3.0,  ancho*0.5 + params["traAnchoVereda"]]
                 tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
                 tF.write("\n")
                 tF.write(";;-------------------------------------------\n")
