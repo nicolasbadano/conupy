@@ -261,6 +261,15 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     # Calculate dead depths
     calculateDeadDepths(nodos, links, lineasOutfall)
 
+    # Flip links
+    linksList = [(n0, n1) for n0, n1 in links]
+    for n0, n1 in linksList:
+        link = links[(n0, n1)]
+        if link["levelFin"] > link["levelIni"]:
+            del links[(n0, n1)]
+            link["levelIni"], link["levelFin"] = link["levelFin"], link["levelIni"]
+            links[(n1, n0)] = link
+
     # Write the network
     writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref)
 
@@ -799,6 +808,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         nodo.area = 1.167
     for (i, centro) in enumerate(centros):
         nodos[centro[2]].area = params["juApondPer"] * subcuencas[i][1]
+
 
     with open(swmmInputFileName, "w") as tF:
         tF.write("[TITLE]\n")
