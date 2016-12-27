@@ -1302,6 +1302,7 @@ def calculateDeadDepths(nodos, links, lineasOutfall):
 
 
     # Elevate nodes to eliminate dead depths
+    print "Raising nodes to eliminate dead depths"
     for n0, n1 in links:
         link = links[(n0, n1)]
         link["levelIni"] += nodos[n0].tirante
