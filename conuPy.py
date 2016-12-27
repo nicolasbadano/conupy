@@ -1289,6 +1289,16 @@ def calculateDeadDepths(nodos, links, lineasOutfall):
         print "Iteracion %i - Max Bajada %f" % (i, maxbajada)
 
 
+    # Elevate nodes to eliminate dead depths
+    for n0, n1 in links:
+        link = links[(n0, n1)]
+        link["levelIni"] += nodos[n0].tirante
+        link["levelFin"] += nodos[n1].tirante
+    for nodo in nodos:
+        nodo.elev += nodo.tirante
+
+
+
 if __name__ == '__main__':
     # Origen de datos
     dataFolder = "F:/Desarrollo/Utilidades/conuPy/Ejemplos/CONUPY_cuenca completa1/"
