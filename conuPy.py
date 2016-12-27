@@ -888,7 +888,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Ymax           Y0             Ysur           Apond) \n")
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
-            if not nodo.type in ["conduit", "2d"]:
+            if not nodo.type in ["conduit", "2d", "channel", "corner"]:
                 continue
             list = ['NODO%d' % i,
                     "%.3f" % (nodo.elev + nodo.offset),
@@ -905,7 +905,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name         Elev           Ymax           Y0             TABULAR        Apond          ) \n")
         tF.write(";;========================================================================================\n")
         for (i, nodo) in enumerate(nodos):
-            if nodo.type in ["conduit", "2d"]:
+            if nodo.type in ["conduit", "2d", "channel", "corner"]:
                 continue
             tF.write(("").join([ str(x).ljust(15, ' ') for x in [
                 'NODO%d' % i,
