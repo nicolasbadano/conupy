@@ -1071,6 +1071,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 tname = link["type"] + str(int(link["w"]))
                 transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
                 list = [name, 'IRREGULAR', tname, 0, 0, 0]
+                #list = [name, 'RECT_OPEN', link.get("h",20), link["w"], 0, 0]
             elif link["type"] == "2d":
                 list = [name, 'RECT_OPEN', 100, 20.0, 2, 0, 1]
             elif link["type"] == "channel":
