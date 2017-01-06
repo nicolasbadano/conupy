@@ -50,9 +50,9 @@ params["minLengthForStreetSpanJoin"] = params["targetDx"] * 2.0/3
 # Default coverage for conduits when no depths or levels were defined
 params["minCoverage"] = 0.3
 # Max distance required for gutters to be created from a corner to a conduit node
-params["maxDistGutter"] = params["targetDx"] * 1.1
+params["maxDistGutter"] = params["targetDx"] * 0.75
 # Max distance required for weirs to be created from a corner to a channel segment
-params["maxDistWeir"] = params["targetDx"] * 0.5
+params["maxDistWeir"] = params["targetDx"] * 0.50
 # Max dist for which outfall nodes are connected to regular nodes
 params["maxDistConnectOutfallNodes"] = params["targetDx"]
 # % of the basin area in which water is stored in a node
