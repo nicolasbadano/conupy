@@ -481,6 +481,17 @@ def createWeirs(nodos, links):
         with timing.getTimer("crearVertedero"):
             # Buscar el tramo de arroyo mas cercano
             nearLinks = links.getLinksNear(nodo.p, params["maxDistWeir"])
+
+            # Skip node if it already has a weir
+            def alreadyHasWeir():
+                for (n10, n11), link  in nearLinks.items():
+                    if n10 == i and link["type"] == "weir":
+                        return True
+                return False
+
+            if alreadyHasWeir():
+                continue
+
             mindist, minj = params["maxDistWeir"], -1
             for (n10, n11), link  in nearLinks.items():
                 if link["type"] != "channel":
