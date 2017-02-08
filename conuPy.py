@@ -796,7 +796,7 @@ def createRainGagesMethod1(centros, stationsFileName):
             gage.coord = np.array([float(data[0]), float(data[1])])
             gage.name = data[2]
             gage.file = data[3]
-            gage.interval = '0:05'
+            gage.interval = '0:10'
             gages.append(gage)
 
     print "Seleccionando pluviómetro para cada subcuenca..."
