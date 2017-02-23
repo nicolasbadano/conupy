@@ -692,9 +692,20 @@ def createSubcatchments(nodos, shpFileCuenca, spatial_ref):
     for (i, nodo) in enumerate(nodos):
         if nodo.type != "conduit":
             centros.append([nodo.p[0], nodo.p[1], i])
+
+    xmax = max(nodo.p[0] for nodo in nodos)
+    xmin = min(nodo.p[0] for nodo in nodos)
+    ymax = max(nodo.p[1] for nodo in nodos)
+    ymin = min(nodo.p[1] for nodo in nodos)
+
+    centros2 = centros[:]
+    centros2.append([0.5 * xmin + 0.5 * xmax, 2.0 * ymax - 1.0 * ymin, -1])
+    centros2.append([0.5 * xmin + 0.5 * xmax, 2.0 * ymin - 1.0 * ymax, -1])
+    centros2.append([2.0 * xmax - 1.0 * xmin, 0.5 * ymin + 0.5 * ymax, -1])
+    centros2.append([2.0 * xmin - 1.0 * xmax, 0.5 * ymin + 0.5 * ymax, -1])
     print "Numero de cuencas:\t%d" % len(centros)
     # Escribir shape con la posicion de los baricentros de subcuencas
-    gis.escribir_shp_puntos(shpFileCentros, centros, {}, spatial_ref)
+    gis.escribir_shp_puntos(shpFileCentros, centros2, {}, spatial_ref)
 
     # Escribir shape con la posicion de los baricentros de subcuencas
     gis.create_thiessen_polygons(shpFileCentros, subcuencasShpFile)
