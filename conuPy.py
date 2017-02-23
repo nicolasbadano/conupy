@@ -131,7 +131,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     shpFileDrainagePrepared, rasterFileDEM):
     # Read the original drainage network
     streams = gis.leer_shp_polilineas(shpFileDrainageOriginal,
-        ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+        ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin', 'transect'])
     spatial_ref = gis.leer_spatial_reference(shpFileDrainageOriginal)
 
     # Write a shape file with the nodes of the network
@@ -147,7 +147,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     # Prepare the drainage network elevations base on available data for each node
     inode = 0
     for stream in streams:
-        points, w, h, typ, depthIni, depthFin, levelIni, levelFin = stream
+        points, w, h, typ, depthIni, depthFin, levelIni, levelFin, transect = stream
         if w is None:
             print "ERROR: Missing w value on stream"
             return
@@ -199,14 +199,15 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     fields["depthFin"] = [stream[5] for stream in streams]
     fields["levelIni"] = [stream[6] for stream in streams]
     fields["levelFin"] = [stream[7] for stream in streams]
-    fields["slope"]    = [float((stream[6] - stream[7]) / stream[8]) for stream in streams]
+    fields["transect"] = ["" if stream[8] is None else stream[8] for stream in streams]
+    fields["slope"]    = [float((stream[6] - stream[7]) / stream[9]) for stream in streams]
     gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
 
     # Create points along streams
     pointsAlongNetwork = []
     levelsAlongNetwork = []
     for stream in streams:
-        points, _, _, _, _, _, levelIni, levelFin, length = stream
+        points, _, _, _, _, _, levelIni, levelFin, _, length = stream
         points = points[:]
         insertPoints(points, 50)
 
@@ -235,7 +236,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
 def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad,
     shpFileNodosBorde, gageMethod, gageFileName, rasterFileCoeficiente,
-    gagesFileName, stationsFileName, swmmInputFileName):
+    gagesFileName, stationsFileName, swmmInputFileName, modelFolder):
 
     # Create nodes and links for the model
     nodos = NodesList()
@@ -290,19 +291,20 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
     saveOnFile(lineasOutfall, 'lineasOutfall')
 
     # Write the model file
-    writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall, gages, subcatchmentGages, swmmInputFileName)
+    writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall, gages, subcatchmentGages, swmmInputFileName, modelFolder)
 
 @print_decorate
 def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     # Read the prepared drainage network
-    streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin'])
+    streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin', 'transect'])
     streams = [Bunch(id = i,
                      points = stream[0],
                      w = float(stream[1]),
                      h = float(stream[2]),
                      typ = str(stream[3]).lower(),
                      levelIni = float(stream[6]),
-                     levelFin = float(stream[7])) for i, stream in enumerate(streams)]
+                     levelFin = float(stream[7]),
+                     transect = str(stream[8]).strip() if stream[8] is not None else "") for i, stream in enumerate(streams)]
 
     # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide
     for stream in streams:
@@ -352,7 +354,8 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
                                "w": stream.w,
                                "h": stream.h,
                                "levelIni": stream.levelIni + (stream.levelFin - stream.levelIni) * progIni / length,
-                               "levelFin": stream.levelIni + (stream.levelFin - stream.levelIni) * progFin / length}
+                               "levelFin": stream.levelIni + (stream.levelFin - stream.levelIni) * progFin / length,
+                               "transect": stream.transect}
 
     print "\tNumber of nodes for the drainage network: %i" % len(nodos)
     print "\tNumber of links for the drainage network: %i" % len(links)
@@ -422,12 +425,14 @@ def readStreets(nodos, links, shpFileCalles):
                                                "w": channel_link["w"],
                                                "h": channel_link["h"],
                                                "levelIni": channel_link["levelIni"],
-                                               "levelFin": levelMid}
+                                               "levelFin": levelMid,
+                                               "transect": channel_link["transect"]}
                     links[(nchannel, nch1)] = {"type": channel_link["type"],
                                                "w": channel_link["w"],
                                                "h": channel_link["h"],
                                                "levelIni": levelMid,
-                                               "levelFin": channel_link["levelFin"]}
+                                               "levelFin": channel_link["levelFin"],
+                                               "transect": channel_link["transect"]}
                     del links[(nch0, nch1)]
 
                 # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
@@ -815,7 +820,7 @@ def createRainGagesMethod1(centros, stationsFileName):
     return gages, subcatchmentGages
 
 @print_decorate
-def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall, gages, subcatchmentGages, swmmInputFileName):
+def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall, gages, subcatchmentGages, swmmInputFileName, modelFolder):
     for nodo in nodos:
         nodo.area = 1.167
     for (i, centro) in enumerate(centros):
@@ -1105,6 +1110,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Link         Type           G1             G2             G3             G4\n")
         tF.write(";;========================================================================================\n")
         transectas = {}
+        customTransects = set()
         for i, ((in0, in1), link) in enumerate(links.iteritems()):
             name = link["type"] + str(i)
 
@@ -1116,8 +1122,12 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
             elif link["type"] == "2d":
                 list = [name, 'RECT_OPEN', 100, 20.0, 2, 0, 1]
             elif link["type"] == "channel":
-                tname = link["type"] + str(int(link["w"])) + "x" + str(int(link["h"]))
-                transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
+                if link["transect"] != "":
+                    tname = link["transect"]
+                    customTransects.add(tname)
+                else:
+                    tname = link["type"] + str(int(link["w"])) + "x" + str(int(link["h"]))
+                    transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
                 list = [name, 'IRREGULAR', tname, 0, 0, 0]
             elif link["type"] == "conduit":
                 list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0]
@@ -1195,6 +1205,11 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
                 tF.write("\n")
                 tF.write(";;-------------------------------------------\n")
+        for transect in customTransects:
+            with open(modelFolder + "/" + transect + ".dat", "r") as iF:
+                for line in iF:
+                    tF.write(line)
+            tF.write(";;-------------------------------------------\n")
 
 
         tF.write("\n")

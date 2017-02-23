@@ -431,7 +431,8 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
             self.rasterFileCoeficiente,
             self.modelFolder + "/" + "pluviom.dat",
             self.stationsFileName,
-            self.modelFolder + "/" + self.modelFileName + ".inp")
+            self.modelFolder + "/" + self.modelFileName + ".inp",
+            self.modelFolder)
 
     # Event handlers de btnActionGenerateRain
     def btnActionGenerateRain_click(self):
