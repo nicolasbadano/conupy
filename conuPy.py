@@ -148,6 +148,8 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     inode = 0
     for stream in streams:
         points, w, h, typ, depthIni, depthFin, levelIni, levelFin, transect = stream
+        if transect is None:
+            transect = ""
         if w is None:
             print "ERROR: Missing w value on stream"
             return
@@ -181,7 +183,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
         else:
             depthFin = nodesTerrainLevels[inode+1] - levelFin
 
-        stream[3], stream[4], stream[5], stream[6], stream[7] = typ, float(depthIni), float(depthFin), float(levelIni), float(levelFin)
+        stream[3], stream[4], stream[5], stream[6], stream[7], stream[8] = typ, float(depthIni), float(depthFin), float(levelIni), float(levelFin), str(transect)
         inode += 2
 
     # Calculate length of each stream
@@ -199,7 +201,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     fields["depthFin"] = [stream[5] for stream in streams]
     fields["levelIni"] = [stream[6] for stream in streams]
     fields["levelFin"] = [stream[7] for stream in streams]
-    fields["transect"] = ["" if stream[8] is None else stream[8] for stream in streams]
+    fields["transect"] = [stream[8] for stream in streams]
     fields["slope"]    = [float((stream[6] - stream[7]) / stream[9]) for stream in streams]
     gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
 
@@ -1148,7 +1150,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 list = [link["type"]+str(i), 'RECT_CLOSED', params["xsSumideroH"], params["xsSumideroW"], 0, 0]
             else:
                 continue
-            tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
+            tF.write(("").join([ str(x).ljust(14, ' ') + ' ' for x in list]))
             tF.write("\n")
         for (i, linea) in enumerate(lineasOutfall):
             in0, in1, ancho = linea
@@ -1217,9 +1219,13 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 tF.write("\n")
                 tF.write(";;-------------------------------------------\n")
         for transect in customTransects:
-            with open(modelFolder + "/" + transect + ".dat", "r") as iF:
-                for line in iF:
-                    tF.write(line)
+            try:
+                with open(modelFolder + "/" + transect + ".dat", "r") as iF:
+                    for line in iF:
+                        tF.write(line)
+                print "Transect file '%s' loaded" % (modelFolder + "/" + transect + ".dat")
+            except:
+                print "WARNING: Transect file '%s' not found" % (modelFolder + "/" + transect + ".dat")
             tF.write(";;-------------------------------------------\n")
 
 
