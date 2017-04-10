@@ -1144,7 +1144,9 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                     transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
                 list = [name, 'IRREGULAR', tname, 0, 0, 0]
             elif link["type"] == "conduit":
-                list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0]
+                if link["transect"] is "":
+                    link["transect"] == 'RECT_CLOSED'
+                list = [name, link["transect"], link["h"], link["w"], 0, 0]
             elif link["type"] == "weir":
                 list = [link["type"]+str(i), 'RECT_OPEN', params["xsVertederoH"], params["xsVertederoW"], 0, 0]
             elif link["type"] == "gutter":
