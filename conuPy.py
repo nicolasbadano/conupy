@@ -78,8 +78,8 @@ params["inCoefDecaim"] = 2.0
 params["inDryTime"] = 5.0
 # Maximum infiltration volume possible (0 if not applicable) (in or mm)
 params["inMaxInf"] = 0
-# Value of n (i.e., roughness parameter) in Manning's equation.
-params["coN"] = 0.04
+# Value of n (i.e., roughness parameter) in Manning's equation for conduits.
+params["coN"] = 0.015
 # Weirs parameters
 params["weAlturaCordon"] = 0.05
 params["weCd"] = 3.0
@@ -91,7 +91,7 @@ params["xsG1"], params["xsG3"], params["xsG4"] = 10, 0, 0
 params["xsSumideroH"], params["xsSumideroW"] = 0.15, 2.0
 params["xsVertederoH"], params["xsVertederoW"] = 10.0, 20.0
 # Transect parameters
-params["traNConducto"] = 0.03
+params["traNConducto"] = 0.017
 params["traNArroyoPlanicie"] = 0.05
 params["traNArroyoCauce"] = 0.03
 params["traNCalle"] = 0.04
