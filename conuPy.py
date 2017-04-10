@@ -628,6 +628,13 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
             nodos[n0].length += length
             nodos[n1].length += length
 
+        # Ensure conduits are always below terrain level
+        if link["type"] == "conduit":
+            link["levelIni"] = min(link["levelIni"],
+                nodos[n0].elev - link["h"] - params["minCoverage"])
+            link["levelFin"] = min(link["levelFin"],
+                nodos[n1].elev - link["h"] - params["minCoverage"])
+
         # Update invert offset if appropiate
         if link["type"] in ["conduit", "channel"]:
             offset0 = link["levelIni"] - nodos[n0].elev
