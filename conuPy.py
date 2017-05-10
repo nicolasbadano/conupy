@@ -82,7 +82,7 @@ params["inMaxInf"] = 0
 params["coN"] = 0.015
 # Weirs parameters
 params["weAlturaCordon"] = 0.05
-params["weCd"] = 3.0
+params["weCd"] = 1.6
 # Orifice parameters
 params["orCd"] = 0.65
 # XSection parameters
