@@ -49,6 +49,8 @@ params["maxLengthForStreetSpanDivide"] = params["targetDx"] * 4.0/3
 params["minLengthForStreetSpanJoin"] = params["targetDx"] * 2.0/3
 # Default coverage for conduits when no depths or levels were defined
 params["minCoverage"] = 0.3
+# Max distance from a stream required for a culvert to be created
+params["maxDistCulvert"] = 5.0
 # Max distance required for gutters to be created from a corner to a conduit node
 params["maxDistGutter"] = params["targetDx"] * 0.75
 # Max distance required for weirs to be created from a corner to a channel segment
@@ -80,6 +82,11 @@ params["inDryTime"] = 5.0
 params["inMaxInf"] = 0
 # Value of n (i.e., roughness parameter) in Manning's equation for conduits.
 params["coN"] = 0.015
+# Culvert parameters
+params["culvertRoadwayCd"] = 1.6
+params["culvertCode"] = 53
+params["culvertKentry"] = 0.4
+params["culvertKexit"] = 1.0
 # Weirs parameters
 params["weAlturaCordon"] = 0.05
 params["weCd"] = 1.6
@@ -236,10 +243,11 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
 
 
 @print_decorate
-def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
-    rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad,
-    shpFileNodosBorde, gageMethod, gageFileName, rasterFileCoeficiente,
-    gagesFileName, stationsFileName, swmmInputFileName, modelFolder):
+def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCulverts,
+    shpFileCalles, shpFileCuenca, rasterFileDEM, rasterFileSlope,
+    rasterFileImpermeabilidad, shpFileNodosBorde, gageMethod, gageFileName,
+    rasterFileCoeficiente, gagesFileName, stationsFileName, swmmInputFileName,
+    modelFolder):
 
     # Create nodes and links for the model
     nodos = NodesList()
@@ -250,6 +258,8 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
 
     # Read the drainage network and create nodes and links
     readDrainageNetwork(nodos, links, shpFileDrainagePrepared)
+    # Read culvert shape and and create culvert nodes and links
+    readCulverts(nodos, links, shpFileCulverts)
     # Read the street network and create nodes and links
     readStreets(nodos, links, shpFileCalles)
     # Create gutters and weirs
@@ -363,6 +373,82 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     print "\tNumber of nodes for the drainage network: %i" % len(nodos)
     print "\tNumber of links for the drainage network: %i" % len(links)
     print "FINISHED: Drainage network construction"
+
+@print_decorate
+def readCulverts(nodos, links, shpFileCulverts):
+    culverts = gis.leer_shp_puntos(shpFileCulverts, ['w','h','wtop','htop','l'])
+    culverts = [Bunch(p = np.array(culvert[0]),
+                      w = float(culvert[1]),
+                      h = float(culvert[2]),
+                      wtop = float(culvert[3]),
+                      htop = float(culvert[4]),
+                      l = float(culvert[5]))
+                      for i, culvert in enumerate(culverts)]
+
+    print "Creando culverts"
+    for culvert in culverts:
+        if culvert.wtop is None:
+            culvert.wtop = 10.0
+        if culvert.htop is None:
+            culvert.htop = culvert.h + 0.30
+        if culvert.l is None:
+            culvert.l = 5.0
+
+        with timing.getTimer("crearCulverts"):
+            # Buscar el tramo de arroyo mas cercano
+            nearLinks = links.getLinksNear(culvert.p, params["maxDistCulvert"])
+
+            mindist, minLinkData = params["maxDistCulvert"], None
+            for (n10, n11), link  in nearLinks.items():
+                if link["type"] != "channel":
+                    continue
+                p10, p11 = nodos[n10].p, nodos[n11].p
+                d = distToSegment(culvert.p, p10, p11)
+                if d < mindist:
+                    mindist = d
+                    minLinkData = (n10, n11, link)
+
+            if minLinkData is None:
+                continue
+
+            nch0, nch1, channel_link = minLinkData
+
+            # Calculate the position of culvert nodes
+            centerPos = 0.5 * (nodos[nch0].p + nodos[nch1].p)
+            direction = (nodos[nch1].p - nodos[nch0].p) / dist(nodos[nch0].p, nodos[nch1].p)
+
+            # Create culvert nodes
+            with timing.getTimer("addNode"):
+                n0 = addNode(nodos, centerPos - direction * culvert.l/2, "channel", 0.0)
+            with timing.getTimer("addNode"):
+                n1 = addNode(nodos, centerPos + direction * culvert.l/2, "channel", 0.0)
+
+            # Create the new channel links and delete the original one
+            alpha = dist(nodos[nch0].p, centerPos) / dist(nodos[nch0].p, nodos[nch1].p)
+            levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
+
+            links[(nch0, n0)] = {"type": channel_link["type"],
+                                 "w": channel_link["w"],
+                                 "h": channel_link["h"],
+                                 "levelIni": channel_link["levelIni"],
+                                 "levelFin": levelMid,
+                                 "transect": channel_link["transect"]}
+            links[(n1, nch1)] = {"type": channel_link["type"],
+                                 "w": channel_link["w"],
+                                 "h": channel_link["h"],
+                                 "levelIni": levelMid,
+                                 "levelFin": channel_link["levelFin"],
+                                 "transect": channel_link["transect"]}
+            del links[(nch0, nch1)]
+
+            links[(n0, n1)] = {"type": "culvert",
+                               "w": culvert.w,
+                               "h": culvert.h,
+                               "wtop": culvert.wtop,
+                               "htop": culvert.htop,
+                               "l": culvert.l,
+                               "levelIni": levelMid,
+                               "levelFin": levelMid,}
 
 @print_decorate
 def readStreets(nodos, links, shpFileCalles):
@@ -623,7 +709,7 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
 
     for (n0, n1), link in links.iteritems():
         # Acumulate the length of segments incoming to the node
-        if link["type"] in ["street", "channel", "2d"]:
+        if link["type"] in ["street", "channel", "2d", "culvert"]:
             length = dist(nodos[n0].p, nodos[n1].p)
             nodos[n0].length += length
             nodos[n1].length += length
@@ -636,7 +722,7 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
                 nodos[n1].elev - link["h"] - params["minCoverage"])
 
         # Update invert offset if appropiate
-        if link["type"] in ["conduit", "channel"]:
+        if link["type"] in ["conduit", "channel", "culvert"]:
             offset0 = link["levelIni"] - nodos[n0].elev
             offset1 = link["levelFin"] - nodos[n1].elev
             nodos[n0].offset = min(nodos[n0].offset, offset0)
@@ -747,21 +833,23 @@ def createSubcatchments(nodos, shpFileCuenca, spatial_ref):
 
 @print_decorate
 def createOutfallNodes(nodos, shpFileNodosBorde):
-    posicionesNodosOutfall = gis.leer_shp_puntos(shpFileNodosBorde)
+    outfalls = gis.leer_shp_puntos(shpFileNodosBorde)
+    outfalls = [Bunch(p = outfall[0])
+                      for i, outfall in enumerate(outfalls)]
 
     nodosOutfall = []
     lineasOutfall = []
     for (i, nodo) in enumerate(nodos):
         # Buscar la posicion outfall mas cercana
         mindist, minj = params["maxDistConnectOutfallNodes"], -1
-        for (j, posNO) in enumerate(posicionesNodosOutfall):
-            if dist(nodo.p, posNO) < mindist:
-                mindist = dist(nodo.p, posNO)
+        for (j, outfall) in enumerate(outfalls):
+            if dist(nodo.p, outfall.p) < mindist:
+                mindist = dist(nodo.p, outfall.p)
                 minj = j
         if minj == -1:
             continue
 
-        nodoOutfall = Bunch(p = np.array(posicionesNodosOutfall[minj]),
+        nodoOutfall = Bunch(p = outfalls[minj].p,
                             elev = nodo.elev,
                             offset = nodo.offset)
         nodosOutfall.append(nodoOutfall)
@@ -1051,7 +1139,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                     "%.3f" % nodos[in0].elev,
                     "%.3f" % nodos[in1].elev,
                     0]
-            elif link["type"] in ["channel", "conduit"]:
+            elif link["type"] in ["channel", "conduit", "culvert"]:
                 list = [
                     name,
                     'NODO'+str(in0),
@@ -1087,20 +1175,39 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
         tF.write(";;Name           From Node        To Node          Type         CrestHt    Qcoeff     Gated    EndCon   EndCoeff   Surcharge \n")
         tF.write(";;-------------- ---------------- ---------------- ------------ ---------- ---------- -------- -------- ---------- ----------\n")
         for i, ((in0, in1), link) in enumerate(links.iteritems()):
-            if link["type"] != "weir":
+            if link["type"] == "weir":
+                name = "weir" + str(i)
+                list = [
+                    name,
+                    'NODO'+str(in0),
+                    'NODO'+str(in1),
+                    "SIDEFLOW",
+                    "%.3f" % (nodos[in0].elev + params["weAlturaCordon"]),
+                    params["weCd"],
+                    "NO",
+                    0,
+                    0,
+                    "NO"]
+            elif link["type"] == "culvert":
+                name = "overpass" + str(i)
+                list = [
+                    name,
+                    'NODO'+str(in0),
+                    'NODO'+str(in1),
+                    "ROADWAY",
+                    "%.3f" % (link["levelIni"] + link["htop"]),
+                    params["culvertRoadwayCd"],
+                    "NO",
+                    0,
+                    0,
+                    "NO",
+                    0,
+                    0,
+                    "%.3f" % link["l"],
+                    "PAVED"
+                    ]
+            else:
                 continue
-            name = "weir" + str(i)
-            list = [
-                name,
-                'NODO'+str(in0),
-                'NODO'+str(in1),
-                "SIDEFLOW",
-                "%.3f" % (nodos[in0].elev + params["weAlturaCordon"]),
-                params["weCd"],
-                "NO",
-                0,
-                0,
-                "NO"]
             tF.write(("").join([ str(x).ljust(15, ' ') for x in list]))
             tF.write("\n")
 
@@ -1154,6 +1261,13 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 if link["transect"] is "":
                     link["transect"] == 'RECT_CLOSED'
                 list = [name, link["transect"], link["h"], link["w"], 0, 0]
+            elif link["type"] == "culvert":
+                # Write cross section for overpass weir
+                list = ["overpass" + str(i), 'RECT_OPEN', params["xsVertederoH"], link["wtop"], 0, 0]
+                tF.write(("").join([ str(x).ljust(14, ' ') + ' ' for x in list]))
+                # Define cross section for underpass conduit
+                list = [name, 'RECT_CLOSED', link["h"], link["w"], 0, 0, 1, params["culvertCode"]]
+                tF.write("\n")
             elif link["type"] == "weir":
                 list = [link["type"]+str(i), 'RECT_OPEN', params["xsVertederoH"], params["xsVertederoW"], 0, 0]
             elif link["type"] == "gutter":
@@ -1236,8 +1350,21 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                 print "Transect file '%s' loaded" % (modelFolder + "/" + transect + ".dat")
             except:
                 print "WARNING: Transect file '%s' not found" % (modelFolder + "/" + transect + ".dat")
+
             tF.write(";;-------------------------------------------\n")
 
+        tF.write("\n")
+        tF.write("[LOSSES]\n")
+        tF.write(";;Link           Kentry     Kexit      Kavg       Flap Gate  Seepage   \n")
+        tF.write(";;=========================================================================\n")
+        for i, ((in0, in1), link) in enumerate(links.iteritems()):
+            name = link["type"] + str(i)
+            if link["type"] == "culvert":
+                list = [name, params["culvertKentry"], params["culvertKexit"], 0, "NO", 0]
+            else:
+                continue
+            tF.write(("").join([ str(x).ljust(14, ' ') + ' ' for x in list]))
+            tF.write("\n")
 
         tF.write("\n")
         tF.write("[REPORT]\n")
@@ -1390,6 +1517,7 @@ if __name__ == '__main__':
     # Archivos de entrada
     shpFileDrainageOriginal     = dataFolder + "Arroyos/Arroyos2.shp"
     shpFileDrainagePrepared     = dataFolder + "Arroyos/Arroyos2Preparados.shp"
+    shpFileCulverts             = dataFolder + "Alcantarillas/Alcantarillas.shp"
     shpFileCalles               = dataFolder + "Calles/Calles_Recortado2.shp"
     shpFileCuenca               = dataFolder + "Cuenca/Cuencas_Laferrere.shp"
     shpFileNodosBorde           = dataFolder + "NodosBorde/NodosBorde.shp"
@@ -1424,8 +1552,8 @@ if __name__ == '__main__':
     if (x == 0):
         mainPrepareDrainageNetwork(shpFileDrainageOriginal, shpFileDrainagePrepared, rasterFileDEM)
     elif (x == 1):
-        mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCalles, shpFileCuenca,
-            rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad,
+        mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCulverts, shpFileCalles,
+            shpFileCuenca, rasterFileDEM, rasterFileSlope, rasterFileImpermeabilidad,
             shpFileNodosBorde, gageMethod, gageFileName, rasterFileCoeficiente,
             gagesFileName, stationsFileName, swmmInputFileName)
     elif (x == 2):

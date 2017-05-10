@@ -70,6 +70,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
 
         self.btnDrainageNetworkOriginal.clicked.connect(self.btnDrainageNetworkOriginal_click)
         self.btnDrainageNetworkPrepared.clicked.connect(self.btnDrainageNetworkPrepared_click)
+        self.btnCulverts.clicked.connect(self.btnCulverts_click)
         self.btnCalles.clicked.connect(self.btnCalles_click)
         self.btnCuenca.clicked.connect(self.btnCuenca_click)
         self.btnNodosBorde.clicked.connect(self.btnNodosBorde_click)
@@ -95,6 +96,9 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
                         QtCore.SIGNAL("textEdited(QString)"),
                         self.leer_datos_generales)
         self.connect(self.textShpFileDrainageNetworkPrepared,
+                        QtCore.SIGNAL("textEdited(QString)"),
+                        self.leer_datos_generales)
+        self.connect(self.textShpFileCulverts,
                         QtCore.SIGNAL("textEdited(QString)"),
                         self.leer_datos_generales)
         self.connect(self.textShpFileCalles,
@@ -140,6 +144,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
 
         self.shpFileDrainageNetworkOriginal = ""
         self.shpFileDrainageNetworkPrepared = ""
+        self.shpFileCulverts = ""
         self.shpFileCalles = ""
         self.shpFileCuenca = ""
         self.shpFileNodosBorde = ""
@@ -160,6 +165,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         variables = [ \
             "shpFileDrainageNetworkOriginal", \
             "shpFileDrainageNetworkPrepared", \
+            "shpFileCulverts", \
             "shpFileCalles", \
             "shpFileCuenca", \
             "shpFileNodosBorde", \
@@ -226,6 +232,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         try:
             self.textShpFileDrainageNetworkOriginal.setText(str(self.shpFileDrainageNetworkOriginal))
             self.textShpFileDrainageNetworkPrepared.setText(str(self.shpFileDrainageNetworkPrepared))
+            self.textShpFileCulverts.setText(str(self.shpFileCulverts))
             self.textShpFileCalles.setText(str(self.shpFileCalles))
             self.textShpFileCuenca.setText(str(self.shpFileCuenca))
             self.textShpFileNodosBorde.setText(str(self.shpFileNodosBorde))
@@ -251,6 +258,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         try:
             self.shpFileDrainageNetworkOriginal = self.textShpFileDrainageNetworkOriginal.text()
             self.shpFileDrainageNetworkPrepared = self.textShpFileDrainageNetworkPrepared.text()
+            self.shpFileCulverts = self.textShpFileCulverts.text()
             self.shpFileCalles = self.textShpFileCalles.text()
             self.shpFileCuenca = self.textShpFileCuenca.text()
             self.shpFileNodosBorde = self.textShpFileNodosBorde.text()
@@ -284,6 +292,15 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         if text is not None and not str(text) == "":
             self.last_path = os.path.dirname(text)
             self.textShpFileDrainageNetworkPrepared.setText(text)
+            self.leer_datos_generales()
+
+    # Event handlers de btnCulverts
+    def btnCulverts_click(self):
+        text = QtGui.QFileDialog.getOpenFileName(self, u'Seleccionar shape de Culverts',
+            self.last_path, u"Shape (*.shp)")
+        if text is not None and not str(text) == "":
+            self.last_path = os.path.dirname(text)
+            self.textShpFileCulverts.setText(text)
             self.leer_datos_generales()
 
     # Event handlers de btnCalles
@@ -420,6 +437,7 @@ class ConuPyDialog(QtGui.QDialog, FORM_CLASS):
         gageMethod = "createRainGagesMethod0" if self.precipitationMethod == 0 else "createRainGagesMethod1"
         conuPy.mainCreateSWMMModel(
             self.shpFileDrainageNetworkPrepared,
+            self.shpFileCulverts,
             self.shpFileCalles,
             self.shpFileCuenca,
             self.rasterFileDEM,

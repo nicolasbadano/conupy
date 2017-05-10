@@ -40,7 +40,10 @@ def leer_shp_puntos(shp_file, lista_campos = []):
     for feature in features:
         geom = feature.geometry()
         x = geom.asPoint()
+
+        poly = []
         punto = np.array([x[0], x[1]])
+        poly.append(punto)
 
         # fetch attributes
         attrs = feature.attributes()
@@ -50,9 +53,9 @@ def leer_shp_puntos(shp_file, lista_campos = []):
             val = attrs[idx] if idx != -1 else None
             if isinstance(val, QtCore.QPyNullVariant):
                 val = None
-            qgis.core.poly.append(val)
+            poly.append(val)
 
-        resultados.append(punto)
+        resultados.append(poly)
 
     print "Finalizado de leer shape de puntos."
     return resultados
