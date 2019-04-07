@@ -35,6 +35,7 @@ subcuencasAreaShpFile       = "subcuencasArea.shp"
 
 # Parameters
 params = {}
+params["removeDeadDepths"] = False
 params["nodeTypesAsJunctions"] = ["conduit", "2d", "channel"] #"corner"
 # Max dist for which channel and stream nodes are snapped together
 params["maxDistSnapStreamNodes"] = 20.0
@@ -139,7 +140,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     shpFileDrainagePrepared, rasterFileDEM):
     # Read the original drainage network
     streams = gis.leer_shp_polilineas(shpFileDrainageOriginal,
-        ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin', 'transect'])
+        ['Ancho', 'Alto', 'Tipo', 'depthIni', 'depthFin', 'levelIni', 'levelFin', 'transect', 'n'])
     spatial_ref = gis.leer_spatial_reference(shpFileDrainageOriginal)
 
     # Write a shape file with the nodes of the network
@@ -155,7 +156,9 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     # Prepare the drainage network elevations base on available data for each node
     inode = 0
     for stream in streams:
-        points, w, h, typ, depthIni, depthFin, levelIni, levelFin, transect = stream
+        points, w, h, typ, depthIni, depthFin, levelIni, levelFin, transect, nm = stream
+        if nm is None:
+            nm = params["coN"]
         if transect is None:
             transect = ""
         if w is None:
@@ -191,7 +194,7 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
         else:
             depthFin = nodesTerrainLevels[inode+1] - levelFin
 
-        stream[3], stream[4], stream[5], stream[6], stream[7], stream[8] = typ, float(depthIni), float(depthFin), float(levelIni), float(levelFin), str(transect)
+        stream[3], stream[4], stream[5], stream[6], stream[7], stream[8], stream[9] = typ, float(depthIni), float(depthFin), float(levelIni), float(levelFin), str(transect), float(nm)
         inode += 2
 
     # Calculate length of each stream
@@ -210,14 +213,15 @@ def mainPrepareDrainageNetwork(shpFileDrainageOriginal,
     fields["levelIni"] = [stream[6] for stream in streams]
     fields["levelFin"] = [stream[7] for stream in streams]
     fields["transect"] = [stream[8] for stream in streams]
-    fields["slope"]    = [float((stream[6] - stream[7]) / stream[9]) for stream in streams]
+    fields["n"]    = [stream[9] for stream in streams]
+    fields["slope"]    = [float((stream[6] - stream[7]) / stream[10]) for stream in streams]
     gis.escribir_shp_polilineas(shpFileDrainagePrepared, polylines, fields, spatial_ref)
 
     # Create points along streams
     pointsAlongNetwork = []
     levelsAlongNetwork = []
     for stream in streams:
-        points, _, _, _, _, _, levelIni, levelFin, _, length = stream
+        points, _, _, _, _, _, levelIni, levelFin, _, _, length = stream
         points = points[:]
         insertPoints(points, 50)
 
@@ -309,7 +313,7 @@ def mainCreateSWMMModel(shpFileDrainagePrepared, shpFileCulverts,
 @print_decorate
 def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
     # Read the prepared drainage network
-    streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin', 'transect'])
+    streams = gis.leer_shp_polilineas(shpFileDrainagePrepared, ['w', 'h', 'type', 'depthIni', 'depthFin', 'levelIni', 'levelFin', 'transect', 'n'])
     streams = [Bunch(id = i,
                      points = stream[0],
                      w = float(stream[1]),
@@ -317,7 +321,8 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
                      typ = str(stream[3]).lower(),
                      levelIni = float(stream[6]),
                      levelFin = float(stream[7]),
-                     transect = str(stream[8]).strip() if stream[8] is not None else "") for i, stream in enumerate(streams)]
+                     transect = str(stream[8]).strip() if stream[8] is not None else "",
+                     nm = float(stream[9]) if stream[9] is not None else params["coN"]) for i, stream in enumerate(streams)]
 
     # Subdivide the streams in spans shorter than maxLengthForStreamSpanDivide
     for stream in streams:
@@ -368,7 +373,8 @@ def readDrainageNetwork(nodos, links, shpFileDrainagePrepared):
                                "h": stream.h,
                                "levelIni": stream.levelIni + (stream.levelFin - stream.levelIni) * progIni / length,
                                "levelFin": stream.levelIni + (stream.levelFin - stream.levelIni) * progFin / length,
-                               "transect": stream.transect}
+                               "transect": stream.transect,
+                               "nm": stream.nm}
 
     print "\tNumber of nodes for the drainage network: %i" % len(nodos)
     print "\tNumber of links for the drainage network: %i" % len(links)
@@ -432,13 +438,15 @@ def readCulverts(nodos, links, shpFileCulverts):
                                  "h": channel_link["h"],
                                  "levelIni": channel_link["levelIni"],
                                  "levelFin": levelMid,
-                                 "transect": channel_link["transect"]}
+                                 "transect": channel_link["transect"],
+                                 "nm": channel_link["nm"]}
             links[(n1, nch1)] = {"type": channel_link["type"],
                                  "w": channel_link["w"],
                                  "h": channel_link["h"],
                                  "levelIni": levelMid,
                                  "levelFin": channel_link["levelFin"],
-                                 "transect": channel_link["transect"]}
+                                 "transect": channel_link["transect"],
+                                 "nm": channel_link["nm"]}
             del links[(nch0, nch1)]
 
             links[(n0, n1)] = {"type": "culvert",
@@ -453,8 +461,11 @@ def readCulverts(nodos, links, shpFileCulverts):
 @print_decorate
 def readStreets(nodos, links, shpFileCalles):
     streets = gis.leer_shp_polilineas(shpFileCalles, ['ANCHO'])
-    streets = [Bunch(points = street[0],
-                     w = float(street[1])) for street in streets]
+    streets = [Bunch(id = i,
+                     points = street[0],
+                     w = float(street[1])) for i, street in enumerate(streets)]
+
+
 
     for street in streets:
         if len(street.points) < 2:
@@ -515,14 +526,15 @@ def readStreets(nodos, links, shpFileCalles):
                                                "h": channel_link["h"],
                                                "levelIni": channel_link["levelIni"],
                                                "levelFin": levelMid,
-                                               "transect": channel_link["transect"]}
+                                               "transect": channel_link["transect"],
+                                               "nm": channel_link["nm"]}
                     links[(nchannel, nch1)] = {"type": channel_link["type"],
                                                "w": channel_link["w"],
                                                "h": channel_link["h"],
                                                "levelIni": levelMid,
                                                "levelFin": channel_link["levelFin"],
-                                               "transect": channel_link["transect"]}
-                    del links[(nch0, nch1)]
+                                               "transect": channel_link["transect"],
+                                               "nm": channel_link["nm"]}
 
                 # Atraviesa un arroyo --> crear conexión entre el las dos esquinas y el arroyo
                 if n0 != nchannel:
@@ -729,7 +741,7 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
             nodos[n1].offset = min(nodos[n1].offset, offset1)
 
     # Set elevations for streets, gutters and weirs
-    for (n0, n1), link in links.iteritems():
+    for i, ((n0, n1), link) in enumerate(links.iteritems()):
         if link["type"] == "street":
             link["levelIni"] = nodos[n0].elev
             link["levelFin"] = nodos[n1].elev
@@ -739,7 +751,7 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
 
             if link["type"] in "weir":
                 if link["levelFin"] > link["levelIni"]:
-                    print "WARNING: Weir %s - channel node invert is higher than the weir crest. This creates instabilties in SWMM."
+                    print "WARNING: Weir %s - channel node invert is higher than the weir crest. This creates instabilties in SWMM." % (str(link["type"]) + str(i))
 
 @print_decorate
 def writeNetworkShapes(nodos, links, shpFileNodos, shpFileLineas, spatial_ref):
@@ -1145,7 +1157,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                     'NODO'+str(in0),
                     'NODO'+str(in1),
                     "%.3f" % length,
-                    "%.3f" % params["coN"],
+                    "%.3f" % link["nm"],
                     "%.3f" % link["levelIni"],
                     "%.3f" % link["levelFin"],
                     0]
@@ -1258,9 +1270,12 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                     transectas[tname] = [link["type"], tname, link["w"], link.get("h",0)]
                 list = [name, 'IRREGULAR', tname, 0, 0, 0]
             elif link["type"] == "conduit":
-                if link["transect"] is "":
+                if link["transect"] == "":
                     link["transect"] == 'RECT_CLOSED'
-                list = [name, link["transect"], link["h"], link["w"], 0, 0]
+                if link["transect"] == "TRAPEZOIDAL":
+                    list = [name, link["transect"], link["h"], link["w"], 1, 1]
+                else:
+                    list = [name, link["transect"], link["h"], link["w"], 0, 0]
             elif link["type"] == "culvert":
                 # Write cross section for overpass weir
                 list = ["overpass" + str(i), 'RECT_OPEN', params["xsVertederoH"], link["wtop"], 0, 0]
@@ -1431,7 +1446,7 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
 
     print "Numero de nodos: ", len(nodos)
 
-    outfile = swmmout.open(swmmOuputFileName)
+    outfile = swmmout.open(swmmOuputFileName, '5.1.012')
 
     query_vars = ['head']
     query_nodes = ['NODO%d' % i for i, nodo in enumerate(nodos)]
@@ -1441,11 +1456,11 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     spatial_ref = gis.leer_spatial_reference(shpFileNodos)
 
     # Escribir shape con los niveles y profundidades en cada paso de tiempo
-    for i, dataline in enumerate(data):
+    for t, dataline in enumerate(data):
         campos = OrderedDict()
         campos["elev"]  = [dataline[i+1][1] for i, nodo in enumerate(nodos)]
         campos["depth"] = [max(dataline[i+1][1] - (nodo.elev + nodo.offset), 0) for i, nodo in enumerate(nodos)]
-        gis.escribir_shp_puntos("nodeDepth%04d.shp" % i, [nodo.p for nodo in nodos], campos, spatial_ref)
+        gis.escribir_shp_puntos("nodeDepth%04d.shp" % t, [nodo.p for nodo in nodos], campos, spatial_ref)
 
     for i, nodo in enumerate(nodos):
         nodo.maxHead = max([dataline[i+1][1] for dataline in data])
@@ -1454,7 +1469,7 @@ def mainReadSWMMResultsDepths(swmmOuputFileName):
     campos = OrderedDict()
     campos["elev"]  = [nodo.maxHead for nodo in nodos]
     campos["depth"] = [max(nodo.maxHead - (nodo.elev + nodo.offset), 0) for nodo in nodos]
-    gis.escribir_shp_puntos(workspace + "/" + "nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
+    gis.escribir_shp_puntos("nodeDepthMax.shp", [nodo.p for nodo in nodos], campos, spatial_ref)
 
 @print_decorate
 def calculateDeadDepths(nodos, links, lineasOutfall):
@@ -1501,14 +1516,14 @@ def calculateDeadDepths(nodos, links, lineasOutfall):
 
 
     # Elevate nodes to eliminate dead depths
-    print "Raising nodes to eliminate dead depths"
-    for n0, n1 in links:
-        link = links[(n0, n1)]
-        link["levelIni"] += nodos[n0].tirante
-        link["levelFin"] += nodos[n1].tirante
-    for nodo in nodos:
-        nodo.elev += nodo.tirante
-
+    if params.get("removeDeadDepths", True):
+        print "Raising nodes to eliminate dead depths"
+        for n0, n1 in links:
+            link = links[(n0, n1)]
+            link["levelIni"] += nodos[n0].tirante
+            link["levelFin"] += nodos[n1].tirante
+        for nodo in nodos:
+            nodo.elev += nodo.tirante
 
 
 if __name__ == '__main__':
