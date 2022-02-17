@@ -39,14 +39,14 @@ params["removeDeadDepths"] = False
 params["nodeTypesAsJunctions"] = ["conduit", "2d", "channel"] #"corner"
 # Max dist for which channel and stream nodes are snapped together
 params["maxDistSnapStreamNodes"] = 20.0
-params["targetDx"] = 50.0
-# Max length stream spans can have without been subdivided
+params["targetDx"] = 100.0
+# Max length stream spans can have without being subdivided
 params["maxLengthForStreamSpanDivide"] = params["targetDx"] * 4.0/3
-# Min length stream spans can have without been joined
+# Min length stream spans can have without being joined
 params["minLengthForStreamSpanJoin"] = params["targetDx"] * 2.0/3
-# Max length street spans can have without been subdivided
+# Max length street spans can have without being subdivided
 params["maxLengthForStreetSpanDivide"] = params["targetDx"] * 4.0/3
-# Min length street spans can have without been joined
+# Min length street spans can have without being joined
 params["minLengthForStreetSpanJoin"] = params["targetDx"] * 2.0/3
 # Default coverage for conduits when no depths or levels were defined
 params["minCoverage"] = 0.3
@@ -57,7 +57,7 @@ params["maxDistGutter"] = params["targetDx"] * 0.75
 # Max distance required for weirs to be created from a corner to a channel segment
 params["maxDistWeir"] = params["targetDx"] * 0.50
 # Max dist for which outfall nodes are connected to regular nodes
-params["maxDistConnectOutfallNodes"] = params["targetDx"]
+params["maxDistConnectOutfallNodes"] = 30.0
 # % of the basin area in which water is stored in a node
 params["juApondPer"] = 0.75
 # Water depth at start of simulation (ft or m) (default is 0).
@@ -74,9 +74,9 @@ params["saSPerv"] = 0 #mm
 # percent of impervious area with no depression storage.
 params["saZero"] = 100 #%
 # Infiltration Horton
-params["inF0"] = 50.0 #mm/hr
-params["inFf"] = 5.0 #mm/hr
-params["inCoefDecaim"] = 2.0
+params["inF0"] = 625.0 #mm/hr
+params["inFf"] = 29.5 #mm/hr
+params["inCoefDecaim"] = 4.5
 # Time it takes for fully saturated soil to dry  (days).
 params["inDryTime"] = 5.0
 # Maximum infiltration volume possible (0 if not applicable) (in or mm)
@@ -96,17 +96,17 @@ params["orCd"] = 0.65
 # XSection parameters
 params["outfallXsWidth"] = 50
 params["xsG1"], params["xsG3"], params["xsG4"] = 10, 0, 0
-params["xsSumideroH"], params["xsSumideroW"] = 0.15, 2.0
+params["xsSumideroH"], params["xsSumideroW"] = 0.15, 4.0
 params["xsVertederoH"], params["xsVertederoW"] = 10.0, 20.0
 # Transect parameters
 params["traNConducto"] = 0.017
 params["traNArroyoPlanicie"] = 0.05
 params["traNArroyoCauce"] = 0.03
-params["traNCalle"] = 0.04
+params["traNCalle"] = 0.015
 params["traAnchoMargenArroyo"] = 20
-params["traAnchoVereda"] = 4.0
+params["traAnchoVereda"] = 2.5
 params["traAltoCordon"] = 0.15
-params["traAltoCentroCalle"] = 0.10
+params["traAltoCentroCalle"] = 0.15
 # 2d zones parameters
 params["cellSize2D"] = 10
 params["maxDist2DConnection"] = 1.5 * params["cellSize2D"]
@@ -520,7 +520,6 @@ def readStreets(nodos, links, shpFileCalles):
 
                     alpha = dist(nodos[nch0].p, nodos[nchannel].p) / dist(nodos[nch0].p, nodos[nch1].p)
                     levelMid = (1 - alpha) * channel_link["levelIni"] + alpha * channel_link["levelFin"]
-
                     links[(nch0, nchannel)] = {"type": channel_link["type"],
                                                "w": channel_link["w"],
                                                "h": channel_link["h"],
@@ -715,7 +714,7 @@ def calculateElevations(nodos, links, shpFileNodos, rasterFileDEM, rasterFileSlo
     for i, nodo in enumerate(nodos):
         nodo.elev = float(nodosElev[i])
         nodo.slope = float(nodosSlope[i])
-        nodo.imper = float(nodosImpermeabilidad[i])
+        nodo.imper = float(nodosImpermeabilidad[i]) if nodosImpermeabilidad[i] is not None else 0.0
         nodo.offset = 0
         nodo.length = 0
 
@@ -1137,7 +1136,7 @@ def writeSWMMFile(nodos, links, centros, subcuencas, nodosOutfall, lineasOutfall
                     'NODO'+str(in0),
                     'NODO'+str(in1),
                     "%.3f" % length,
-                    "%.3f" % params["coN"],
+                    "%.3f" % params["traNCalle"],
                     "%.3f" % nodos[in0].elev,
                     "%.3f" % nodos[in1].elev,
                     0]

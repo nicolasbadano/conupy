@@ -4,10 +4,10 @@
 - Convert streams, conduits and street data into SWMM models.
 - Support spatially distributed rainfall.
 - Post-process flood maps, both from event envelopes and individual time steps.
-- Supports QGIS and ArcGIS 10.1 for geographic backends
+- Supports QGIS 2.x and ArcGIS 10.1 for geographic backends
 
 # Installing
-Currently the QGIS engine is recommended, given it's the development platform used at the moment. **conuPy** can be loaded as a QGIS plugin by extracting all the source files under the following folder:
+Currently using QGIS 2.X is recommended, given it's the development platform used at the moment. **conuPy** can be loaded as a QGIS plugin by extracting all the source files under the following folder:
 
 On Windows:
 
@@ -68,10 +68,10 @@ This dataset represents the exit point/s of the catchment, where water is allowe
 The elevation model should be provided as a raster in GRID format, covering the entirety of the catchment.
 
 ### General Terrain slopes
-The general terrain slope should be provided as a raster in GRID format, covering the entirety of the catchment. This data represents an average value of the subcatchments slope, that is sampled by **conpuPy** on each subcatchment center. It should therefore not be computed as a pixel slope.
+The general terrain slope should be provided as a raster in GRID format, covering the entirety of the catchment. This data represents an average value of the subcatchments slope, that is sampled by **conuPy** on each subcatchment center. It should therefore not be computed as a pixel slope.
 
 ### Rainfall coefficient
 This dataset should be provided as a raster in GRID format. It represents a map of coefficients (typically betwen 0 and 1) that are multiplied by the main rainfall time series to simulate the spatial distribution of the storm.
 
 ### Impermeability
-This dataset should be provided as a raster in GRID format. It represents the coefficient of impermeability on each zone; it is sampled by **conpuPy** on each subcatchment center. The raster should be in the 0 to 100 range, with 100 representng full impermeability.
+This dataset should be provided as a raster in GRID format. It represents the coefficient of impermeability on each zone; it is sampled by **conuPy** on each subcatchment center. The raster should be in the 0 to 100 range, with 100 representng full impermeability.

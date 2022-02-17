@@ -71,7 +71,6 @@ def leer_shp_polilineas(shp_file, lista_campos = []):
     for feature in features:
         geom = feature.geometry()
         x = geom.asPolyline()
-
         poly = []
         puntos = []
         for p in x:
@@ -262,7 +261,11 @@ def sample_raster_on_nodes(nodesFile, rasterFile):
 
         res = rasterLayer.dataProvider().identify(point, qgis.core.QgsRaster.IdentifyFormatValue)
         if res.isValid():
-            values.append(float(res.results().values()[0]))
+            result = res.results().values()[0]
+            if result is None:
+                values.append(None)
+            else:
+                values.append(float(result))
         else:
             values.append(None)
 
