@@ -1,4 +1,4 @@
-![alt text](https://github.com/esteldunedain/conupy/blob/master/logo.png?raw=true)
+![alt text](https://github.com/esteldunedain/conupy/blob/master/logo_sm.png?raw=true)
 
 **conuPy** is a python program designed to create complete SWMM schematizations of complex urban catchments from easily available geographic data.
 
